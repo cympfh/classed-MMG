@@ -54,7 +54,7 @@ ostream& operator<<(ostream& os, PUnit r) {
     case POS:
       return os << '<' << r.pos << '>';
     case WORD:
-      return os << r.word;
+      return os << r.word << '/' << r.pos;
   }
 }
 
@@ -171,10 +171,18 @@ set<Alphabet> alphabets(vi&c) {
 
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
-Pattern tighten(Pattern p, vi&c)
+Pattern tighten(Pattern p, vi&c, bool origin=false)
 {
   const int n = p.size();
-  // cerr << "tighten: " << p << endl;
+
+  if (DEBUG) {
+    if (origin) {
+      cerr << "tighten: ";
+    } else {
+      cerr << " -> ";
+    }
+    cerr << p << endl;;
+  }
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
@@ -219,6 +227,9 @@ Pattern tighten(Pattern p, vi&c)
     }
   }
 
+  if (DEBUG) {
+    cerr << "tighten end" << endl;
+  }
   return p; // final
 }
 
@@ -331,7 +342,7 @@ vector<Pattern> kmmg(int K, vector<Text>&_docs)
   vi ids(n); rep(i, n) ids[i] = i;
 
   Pattern top { PUnit() };
-  auto pc = tighten(top, ids);
+  auto pc = tighten(top, ids, true);
 
   // いくつのパターンに被覆されているか
   vi cover_count(n, 1);
@@ -380,7 +391,7 @@ vector<Pattern> kmmg(int K, vector<Text>&_docs)
         if (cover_count[i] == 1) S.push_back(i);
         else --cover_count[i];
       }
-      auto p_next = tighten(pc_next.first, S);
+      auto p_next = tighten(pc_next.first, S, true);
       pcs.push({ -num_of_fixed(p_next), { p_next, S }});
     }
   }

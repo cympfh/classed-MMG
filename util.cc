@@ -1,3 +1,4 @@
+#include "./global.cc"
 #include <bits/stdc++.h>
 using namespace std;
 

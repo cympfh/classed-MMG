@@ -3,6 +3,16 @@ using namespace std;
 
 int main(int argc, char*argv[])
 {
+  // parse args
+  {
+    for (int i = 1; i < argc; ++i) {
+      string s (argv[i]);
+      if (s == "-D") {
+        DEBUG = true;
+        continue;
+      }
+    }
+  }
 
   // read documents
   vector<Text> docs;
@@ -23,7 +33,7 @@ int main(int argc, char*argv[])
 
       Text text;
       rep (i, s.size()) { text.push_back(Alphabet(p[i], s[i])); }
-      trace(text);
+      if (DEBUG) trace(text);
       docs.push_back(text);
     }
   }
