@@ -19,6 +19,12 @@ ostream& operator<<(ostream& os, vector<T> v) {
   return os;
 }
 
+template<class T>
+ostream& operator<<(ostream& os, set<T> v) {
+  for (T t: v) os << t << ' ';
+  return os;
+}
+
 template<class S, class T>
 ostream& operator<<(ostream& os, pair<S,T> p) {
   os << '(' << p.first << ", " << p.second << ')';

@@ -11,6 +11,10 @@ int main(int argc, char*argv[])
         DEBUG = true;
         continue;
       }
+      if (s == "-K") {
+        K = str_to_int(string(argv[i+1]));
+        if (DEBUG) trace(K);
+      }
     }
   }
 
@@ -27,8 +31,9 @@ int main(int argc, char*argv[])
       auto p = as_words(poss);
       if (s.size() != p.size()) {
         cerr << "wrong numbers: #words should equal to #pos" << endl;
-        cerr << "  " << sentence << endl;
-        cerr << "  " << poss << endl;
+        cerr << "  (" << s.size() << ") " << sentence << endl;
+        cerr << "  (" << p.size() << ") " << poss << endl;
+        return 1;
       }
 
       Text text;
@@ -39,7 +44,7 @@ int main(int argc, char*argv[])
   }
 
   // 行くぜ
-  auto result = kmmg(1, docs);
+  auto result = kmmg(K, docs);
   for (auto& p: result) {
     cout << p << endl;
   }

@@ -293,12 +293,12 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     return x.second.size() > y.second.size();
   };
 
-  { // 貪欲に最小集合被覆
+  { // 貪欲に近似の最小集合被覆
     int i = 0;
     set<int> m;
     while (m.size() < M) {
       sort(cspc.begin() + i, cspc.end(), sort_by_setsize);
-      vi v(cspc[i].second.size());
+      vi v;
       for (int id: cspc[i].second) {
         v.push_back(id);
         if (m.count(id) == 0) {
@@ -309,6 +309,12 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
       div.push_back({ cspc[i].first, v });
       ++i;
     }
+  }
+
+  if (DEBUG) {
+    cerr << "# division of " << p << endl;
+    cerr << "following " << div.size() << " patterns" << endl;
+    for (auto& p: div) cerr << " -- " << p << endl;
   }
 
   return div;
@@ -353,7 +359,8 @@ vector<Pattern> kmmg(int K, vector<Text>&_docs)
   vector<Pattern> ret;
 
   /* division */
-  while (not pcs.empty()) {
+  while (not pcs.empty())
+  {
     auto tpl = pcs.top(); pcs.pop();
     auto& p = tpl.second.first;
     auto& c = tpl.second.second;
@@ -366,13 +373,19 @@ vector<Pattern> kmmg(int K, vector<Text>&_docs)
     }
     if (S.size() == 0) continue;
 
-    auto pcs_next = division(pc, S);
+    vector<pair<Pattern, vi>> pcs_next = division(pc, S);
     if (pcs_next.size() < 2) { // not divisible
       ret.push_back(p);
       continue;
     }
 
-    if (ret.size() + pcs.size() + pcs_next.size() > K) {
+    if (ret.size() + pcs.size() + pcs_next.size() > K) { // over
+      if (DEBUG) {
+        cerr << "#pattern is over K=" << K << endl;
+        trace(ret.size());
+        trace(pcs.size());
+        trace(pcs_next.size());
+      }
       ret.push_back(p);
       while (not pcs.empty()) {
         ret.push_back(pcs.top().second.first);
