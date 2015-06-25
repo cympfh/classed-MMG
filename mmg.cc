@@ -1,5 +1,8 @@
 #include "util.cc"
+#include <gmpxx.h>
 using namespace std;
+
+using Integer = mpz_class;
 
 enum PUnitType {
   VAR, POS, WORD
@@ -408,6 +411,40 @@ vector<Pattern> kmmg(int K, vector<Text>&_docs)
       pcs.push({ -num_of_fixed(p_next), { p_next, S }});
     }
   }
-
   return ret;
 }
+
+Integer alphabet_size = -1;
+map<string, Integer> class_size;
+set<Alphabet> vocabulary;
+
+Integer language_size(Pattern&p, int ell)
+{
+  // memoize
+  for (auto& u: p) {
+    if (u.t == VAR) {
+      if (alphabet_size < 0) {
+        for (auto& text: docs) {
+          for (auto& a: text) {
+            vocabulary.insert(a);
+          }
+        }
+        alphabet_size = vocabulary.size();
+      }
+    }
+    else if (u.t == POS) {
+      if (class_size.count(u.pos) == 0) {
+        Integer i = 0;
+        for (auto& a: vocabulary) {
+          if (a.pos == u.pos) ++i;
+        }
+        class_size[u.pos] = i;
+      }
+    }
+  }
+
+  // DP
+  Integer r = 1;
+  return r;
+}
+
