@@ -317,7 +317,7 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
   if (DEBUG) {
     cerr << "# division of " << p << endl;
     cerr << "following " << div.size() << " patterns" << endl;
-    for (auto& p: div) cerr << " -- " << p << endl;
+    for (auto& p: div) cerr << " -- " << p.first << endl;
   }
 
   return div;
@@ -376,8 +376,11 @@ vector<Pattern> kmmg(int K, vector<Text>&_docs)
     }
     if (S.size() == 0) continue;
 
-    vector<pair<Pattern, vi>> pcs_next = division(pc, S);
+    vector<pair<Pattern, vi>> pcs_next = division(p, S);
     if (pcs_next.size() < 2) { // not divisible
+      if (DEBUG) {
+        cerr << "a pattern " << p << " is not divisible" << endl;
+      }
       ret.push_back(p);
       continue;
     }
