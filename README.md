@@ -18,21 +18,21 @@ rho(p) =
 ### 入力フォーマット
 
 ```bash
-% cat input
-x x b c d e f
-S S V C D E F
-y b c d e f
-S V C D E F
+% cat sample-input
+x_S x_S b_V c_C d_D e_E f_F
+y_S b_V c_C d_D e_E f_F
 ```
 
-1行目に1文目、2行目に1文目の単語POSの列  
-以下同様に、
-(2n-1)行目にn文目、(2n)行目にn文目の単語POSの列
+一行が一文.
+単語とその品詞とを `\_` でもって連接したものを空白区切りで書く.
+
+`xx_SS` という単位を `string` で受け取って、
+長さをnとしたとき、n-2文字目からさかのぼって最初に見つけた `_` で2つに区切る.
 
 ### 出力例
 
 ```
-% mmg < input
+% mmg < sample-input
 <S> <> c/C d/D e/E f/F
 ```
 
@@ -41,11 +41,10 @@ S V C D E F
 `<>` は任意の語の列が、ただし長さが1以上の列が入る変数。  
 `c/C` は `C` というPOSの語である `c` というアルファベット。  
 
-
 ### デバッグモード (冗長モード)
 
 ```bash
-% mmg -D < input
+% mmg -D < sample-input
 >>> text = x/S x/S b/V c/C d/D e/E f/F
 >>> text = y/S b/V c/C d/D e/E f/F
 tighten: <>

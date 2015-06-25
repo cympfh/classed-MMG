@@ -31,17 +31,6 @@ ostream& operator<<(ostream& os, pair<S,T> p) {
   return os;
 }
 
-vector<string> as_words(string s) {
-  stringstream sin(s);
-  vector<string> words;
-  for (;;) {
-    string s; sin >> s;
-    if (!sin) break;
-    words.push_back(s);
-  }
-  return words;
-}
-
 double str_to_double(string s) {
   stringstream a(s);
   double r; a >> r;

@@ -1,6 +1,33 @@
 #include "./mmg.cc"
 using namespace std;
 
+pair<string, string> split_word_pos(string&s)
+{
+  string w, p;
+  const int n = s.size();
+  int i;
+  for (i = n - 2; i >= 0; --i) {
+    if (s[i] == '_') break;
+  }
+  assert(i > 0);
+  w = s.substr(0, i);
+  p = s.substr(i + 1);
+  return make_pair(w, p);
+}
+
+Text to_sentence(string s)
+{
+  stringstream sin(s);
+  Text t;
+  for (;;) {
+    string s; sin >> s;
+    if (!sin) break;
+    auto pr = split_word_pos(s);
+    t.push_back( Alphabet(pr.second, pr.first) );
+  }
+  return t;
+}
+
 int main(int argc, char*argv[])
 {
   // parse args
@@ -21,23 +48,11 @@ int main(int argc, char*argv[])
   // read documents
   vector<Text> docs;
   {
-    string sentence;
-    string poss;
+    string ln;
     loop {
-      getline(cin, sentence);
-      getline(cin, poss);
+      getline(cin, ln);
       if (not cin) break;
-      auto s = as_words(sentence);
-      auto p = as_words(poss);
-      if (s.size() != p.size()) {
-        cerr << "wrong numbers: #words should equal to #pos" << endl;
-        cerr << "  (" << s.size() << ") " << sentence << endl;
-        cerr << "  (" << p.size() << ") " << poss << endl;
-        return 1;
-      }
-
-      Text text;
-      rep (i, s.size()) { text.push_back(Alphabet(p[i], s[i])); }
+      Text text = to_sentence(ln);
       if (DEBUG) trace(text);
       docs.push_back(text);
     }
