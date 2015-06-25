@@ -1,8 +1,7 @@
 #include "util.cc"
 #include <gmpxx.h>
+#include "mmg.hh"
 using namespace std;
-
-using Integer = mpz_class;
 
 enum PUnitType {
   VAR, POS, WORD
@@ -15,8 +14,8 @@ struct PUnit
   string word;
 
   PUnit() : t(VAR) {}
-  PUnit(string pos_) : pos(pos_) {}
-  PUnit(string pos_, string w) : pos(pos_), word(w) {}
+  PUnit(string pos_) : t(POS), pos(pos_) {}
+  PUnit(string pos_, string w) : t(WORD), pos(pos_), word(w) {}
 
   bool operator!=(PUnit&rh) {
     if (this-> t != rh.t) return true;
@@ -61,8 +60,6 @@ ostream& operator<<(ostream& os, PUnit r) {
   }
 }
 
-using Pattern = vector<PUnit>;
-
 int num_of_fixed(Pattern& p) {
   int n = 0;
   for (auto&u: p)
@@ -90,8 +87,6 @@ struct Alphabet {
 ostream& operator<<(ostream& os, const Alphabet& a) {
   return os << a.word << '/' << a.pos;
 }
-
-using Text = vector<Alphabet>;
 
 /* non-erasing generalization system <= */
 
@@ -135,8 +130,6 @@ bool preceq(Text& s, Pattern& p) {
   }
   return preceq_table[n-1][m-1];
 }
-
-vector<Text> docs;
 
 // S subseteq L(p); S = { docs[i] : i <- c }
 bool language_include(vi&c, Pattern&p) {
@@ -421,7 +414,9 @@ Integer alphabet_size = -1;
 map<string, Integer> class_size;
 set<Alphabet> vocabulary;
 
-Integer language_size(Pattern&p, int ell)
+Integer language_size_table[200][200];
+
+Integer language_size(Pattern&p, int ell, bool DEBUG=false)
 {
   // memoize
   for (auto& u: p) {
@@ -433,6 +428,7 @@ Integer language_size(Pattern&p, int ell)
           }
         }
         alphabet_size = vocabulary.size();
+        if (DEBUG) trace(alphabet_size);
       }
     }
     else if (u.t == POS) {
@@ -442,12 +438,66 @@ Integer language_size(Pattern&p, int ell)
           if (a.pos == u.pos) ++i;
         }
         class_size[u.pos] = i;
+        if (DEBUG) trace(make_pair(u.pos, class_size[u.pos]));
       }
     }
   }
 
   // DP
-  Integer r = 1;
-  return r;
+  assert(p.size() < 200);
+  assert(ell < 200);
+
+  const int n = p.size();
+  rep (i, ell) rep (j, n) language_size_table[i][j] = 0;
+
+  rep (i, ell) {
+    rep (j, n) {
+      if (i == 0 and j == 0) {
+        Integer r;
+        {
+          if (p[0].t == VAR) r = alphabet_size;
+          else if (p[0].t == POS) r = class_size[p[0].pos];
+          else r = 1;
+        }
+        language_size_table[0][0] = r;
+      }
+      else if (i == 0) {
+        language_size_table[0][j] = 0;
+      }
+      else if (j == 0) {
+        if (p[0].t == VAR) {
+          language_size_table[i][j] = language_size_table[i-1][j] * alphabet_size;
+        } else {
+          language_size_table[i][j] = 0;
+        }
+      }
+      else {
+        Integer r;
+        {
+          r = language_size_table[i-1][j-1];
+          if (p[j].t == VAR) r *= alphabet_size;
+          else if (p[j].t == POS) r *= class_size[p[j].pos];
+          if (i == 1 and j == 1) trace(p[j]);
+        }
+
+        Integer s = 0;
+        {
+          if (p[j].t == VAR) s = language_size_table[i-1][j] * alphabet_size;
+        }
+
+        language_size_table[i][j] = r + s;
+      }
+    }
+  }
+
+  if (DEBUG) {
+    rep (i, ell) {
+      rep (j, n) {
+        cout << language_size_table[i][j] << ' ';
+      } cout << endl;
+    }
+  }
+
+  return language_size_table[ell-1][n-1];
 }
 
