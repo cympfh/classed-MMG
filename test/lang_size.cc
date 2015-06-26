@@ -1,4 +1,4 @@
-#include "./mmg.cc"
+#include "../mmg.cc"
 using namespace std;
 
 void test(Pattern&p, int ell) {

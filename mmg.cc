@@ -336,9 +336,26 @@ Pattern var_simplify(Pattern&s) {
   return r;
 }
 
-vector<Pattern> kmmg(int K, vector<Text>&_docs)
-{
+void init(vector<Text>& _docs) {
   docs = _docs;
+
+  class_size.clear();
+  vocabulary.clear();
+
+  for (const Text& doc: docs) {
+    for (const Alphabet& a: doc) {
+      vocabulary.insert(a);
+    }
+  }
+  alphabet_size = vocabulary.size();
+
+  for (const Alphabet& a: vocabulary) {
+    class_size[a.pos]++;
+  }
+}
+
+vector<Pattern> kmmg(int K)
+{
   const int n = docs.size();
 
   vi ids(n); rep(i, n) ids[i] = i;
@@ -410,38 +427,10 @@ vector<Pattern> kmmg(int K, vector<Text>&_docs)
   return ret;
 }
 
-Integer alphabet_size = -1;
-map<string, Integer> class_size;
-set<Alphabet> vocabulary;
-
 Integer language_size_table[200][200];
 
 Integer language_size(Pattern&p, int ell, bool DEBUG=false)
 {
-  // memoize
-  for (auto& u: p) {
-    if (u.t == VAR) {
-      if (alphabet_size < 0) {
-        for (auto& text: docs) {
-          for (auto& a: text) {
-            vocabulary.insert(a);
-          }
-        }
-        alphabet_size = vocabulary.size();
-        if (DEBUG) trace(alphabet_size);
-      }
-    }
-    else if (u.t == POS) {
-      if (class_size.count(u.pos) == 0) {
-        Integer i = 0;
-        for (auto& a: vocabulary) {
-          if (a.pos == u.pos) ++i;
-        }
-        class_size[u.pos] = i;
-        if (DEBUG) trace(make_pair(u.pos, class_size[u.pos]));
-      }
-    }
-  }
 
   // DP
   assert(p.size() < 200);

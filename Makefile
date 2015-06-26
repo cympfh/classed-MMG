@@ -11,4 +11,4 @@ test: util.cc mmg.cc test.cc
 	g++ -std=c++11 -o $@ test.cc -lgmp -lgmpxx
 
 clean:
-	rm test mmg
+	-rm mmg

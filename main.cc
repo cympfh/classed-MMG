@@ -58,8 +58,11 @@ int main(int argc, char*argv[])
     }
   }
 
+  // dassee
+  init(docs);
+
   // 行くぜ
-  auto result = kmmg(K, docs);
+  auto result = kmmg(K);
   for (auto& p: result) {
     cout << p << endl;
   }
