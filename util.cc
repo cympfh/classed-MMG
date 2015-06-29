@@ -31,6 +31,14 @@ ostream& operator<<(ostream& os, pair<S,T> p) {
   return os;
 }
 
+template<class S, class T>
+ostream& operator<<(ostream& os, map<S,T>& m) {
+  for (const pair<S,T>& pr: m) {
+    os << pr << ' ';
+  }
+  return os;
+}
+
 double str_to_double(string s) {
   stringstream a(s);
   double r; a >> r;
@@ -45,3 +53,17 @@ int str_to_int(string s) {
 
 using vi = vector<int>;
 
+template<typename T>
+string d2b(T s, int n) {
+  stringstream sout;
+  vi xs;
+  rep (i, n) {
+    if (s & (1 << i)) xs.push_back(i);
+  }
+  if (xs.size() == 0) {
+    return "(empty bit-set)";
+  }
+  sout << xs[0];
+  rep (i, xs.size()-1) sout << ',' << xs[i+1];
+  return sout.str();
+}

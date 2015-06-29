@@ -1,8 +1,11 @@
-do: lang_size.exe
-	./lang_size.exe < lang_size-input
+all: lang_size
+	make clean
 
-lang_size.exe: util.cc mmg.cc lang_size.cc
-	g++ -std=c++11 -o $@ lang_size.cc -lgmp -lgmpxx
+lang_size: lang_size.exe
+	./lang_size.exe < ../sample-input
+
+%.exe: %.cc
+	g++ -std=c++11 -o $@ $^ -lgmp -lgmpxx
 
 clean:
 	rm *.exe

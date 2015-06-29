@@ -431,7 +431,6 @@ Integer language_size_table[200][200];
 
 Integer language_size(Pattern&p, int ell, bool DEBUG=false)
 {
-
   // DP
   assert(p.size() < 200);
   assert(ell < 200);
@@ -490,3 +489,129 @@ Integer language_size(Pattern&p, int ell, bool DEBUG=false)
   return language_size_table[ell-1][n-1];
 }
 
+void DFA(Pattern&p, int ell, bool DEBUG=false)
+{
+
+  // NFA construction
+  vector< map<PUnit, vi> > nfa(1); // nfa[state][alphabet] = { next states }
+  vector< vector<PUnit> > deg(1); // deg[state] = keys of nfa[state]
+
+  int n = 0;
+  for (const PUnit& a: p)
+  {
+    nfa[n][a].push_back( n+1 );
+    deg[n].push_back(a);
+    nfa.push_back({});
+    deg.push_back({});
+    if (a.t == VAR) {
+      nfa[n+1][a].push_back( n+1 );
+      deg[n+1].push_back(a);
+    }
+    n++;
+  }
+  n++;
+
+  // n == nfa.size()
+  // state #0 is the initial
+  // state #{n-1} is the final state.
+
+  if (DEBUG) {
+    for (int i = 0; i < nfa.size(); ++i) {
+      cout << "#" << i << " " << nfa[i] << endl;
+    }
+  }
+  trace(n);
+
+  using State = long long unsigned int;
+  // bit で NFA State の集合を表現します.
+  // 初期状態は0bit目だけ立ってるので 1 です.
+
+  if (DEBUG) { trace(nfa.size()); trace(8 * sizeof(State)); }
+  assert (nfa.size() < 8*sizeof(State));
+
+  map<State, map<PUnit, State>> dfa; // dfa[state][alphabet] = next state
+
+  { // BFS
+    queue<State> que; que.push(1);
+    map<State, bool> visited;
+    const PUnit var;
+
+    while (not que.empty())
+    {
+      State P = que.front(); que.pop();
+      if (visited[P]) continue;
+
+      vector<int> states; // in NFA
+      {
+        for (int p = 0; p < n; ++p) {
+          if ((1 << p) & P) states.push_back(p);
+        }
+      }
+
+      set<PUnit> readable_pos, readable_words;
+      {
+        for (int p: states) {
+          for (const PUnit& a: deg[p]) {
+            if (a.t == POS) { readable_pos.insert(a); }
+            else if (a.t == WORD) { readable_words.insert(a); }
+          }
+        }
+      }
+
+      for (const PUnit& a: readable_words) {
+        assert(a.t == WORD);
+        PUnit pos_of_a(a.pos);
+        State Q = 0;
+        for (int p: states) {
+          if (nfa[p].count(a) > 0) {
+            for (int q: nfa[p][a])  Q |= 1 << q;
+          }
+          if (nfa[p].count(pos_of_a) > 0) {
+            for (int q: nfa[p][pos_of_a]) Q |= 1 << q;
+          }
+          if (nfa[p].count(var) > 0) {
+            for (int q: nfa[p][var]) Q |= 1 << q;
+          }
+        }
+        que.push(Q);
+        dfa[P][a] = Q;
+      }
+
+      for (const PUnit& a: readable_pos) { // reads POS - readble_words
+        assert(a.t == POS);
+        State Q = 0;
+        for (int p: states) {
+          if (nfa[p].count(a) > 0) {
+            for (int q: nfa[p][a])  Q |= 1 << q;
+          }
+          if (nfa[p].count(var) > 0) {
+            for (int q: nfa[p][var]) Q |= 1 << q;
+          }
+        }
+        que.push(Q);
+        dfa[P][a] = Q;
+      }
+
+      { // reads rest characters
+        State Q = 0;
+        for (int p: states) {
+          if (nfa[p].count(var) > 0) {
+            for (int q: nfa[p][var]) Q |= 1 << q;
+          }
+        }
+        que.push(Q);
+        dfa[P][var] = Q;
+      }
+
+      if (DEBUG) {
+        cerr << "#" << d2b(P, n);
+        for (auto& pr: dfa[P]) {
+          cerr << ' ' << make_pair(pr.first, d2b(pr.second, n));
+        } cerr << endl;
+      }
+
+      visited[P] = true;
+    }
+  }
+
+}
