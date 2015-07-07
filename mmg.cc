@@ -167,18 +167,9 @@ set<Alphabet> alphabets(vi&c) {
 
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
-Pattern tighten(Pattern p, vi&c, bool origin=false)
+Pattern tighten(Pattern p, vi&c)
 {
   const int n = p.size();
-
-  if (DEBUG) {
-    if (origin) {
-      cerr << "tighten: ";
-    } else {
-      cerr << " -> ";
-    }
-    cerr << p << endl;;
-  }
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
@@ -223,9 +214,6 @@ Pattern tighten(Pattern p, vi&c, bool origin=false)
     }
   }
 
-  if (DEBUG) {
-    cerr << "tighten end" << endl;
-  }
   return p; // final
 }
 
@@ -367,7 +355,7 @@ vector<Pattern> kmmg(int K)
   vi ids(n); rep(i, n) ids[i] = i;
 
   Pattern top { PUnit() };
-  auto pc = tighten(top, ids, true);
+  auto pc = tighten(top, ids);
 
   // いくつのパターンに被覆されているか
   vi cover_count(n, 1);
@@ -397,18 +385,19 @@ vector<Pattern> kmmg(int K)
     if (S.size() == 0) continue;
 
     vector<pair<Pattern, vi>> pcs_next = division(p, S);
-    if (pcs_next.size() < 2) { // not divisible
+
+    // when not divisible
+    if (pcs_next.size() < 2) {
       if (DEBUG) { cerr << "a pattern " << p << " is not divisible" << endl; }
       ret.push_back(p);
       continue;
     }
 
+    // when |P| > K
     if (ret.size() + pcs.size() + pcs_next.size() > K) {
       if (DEBUG) {
         cerr << "#pattern is over K=" << K << endl;
-        trace(ret.size());
-        trace(pcs.size());
-        trace(pcs_next.size());
+        trace(ret.size()); trace(pcs.size()); trace(pcs_next.size());
       }
       ret.push_back(p);
       while (not pcs.empty()) {
@@ -419,22 +408,23 @@ vector<Pattern> kmmg(int K)
     }
 
     for (auto&pc_next: pcs_next) {
-      for (int i: pc_next.second) ++cover_count[i];
-    }
-    for (auto&pc_next: pcs_next) {
       // Doc - (Pi - pc_next)
       vi S;
       for (int i: pc_next.second) {
-        if (cover_count[i] == 1) S.push_back(i);
-        else --cover_count[i];
+        if (cover_count[i] == 0) S.push_back(i);
       }
-      auto p_next = tighten(pc_next.first, S, true);
+      auto p_next = tighten(pc_next.first, S);
       if (RANDOM_PRIORITY) {
         pcs.push({ rand()%20, { p_next, S }});
       } else {
         pcs.push({ language_size(p_next, 30), { p_next, S }});
       }
     }
+
+    for (auto&pc_next: pcs_next) {
+      for (int i: pc_next.second) ++cover_count[i];
+    }
+
   }
   return ret;
 }
