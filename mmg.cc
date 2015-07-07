@@ -165,6 +165,13 @@ set<Alphabet> alphabets(vi&c) {
   return s;
 }
 
+// max |s| : s <- docs[i], i <- c
+int upper_length(const vi& c) {
+  int r = 0;
+  for (int i: c) r = max<int>(r, docs[i].size());
+  return r;
+}
+
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
 Pattern tighten(Pattern p, vi&c)
@@ -365,7 +372,8 @@ vector<Pattern> kmmg(int K)
   if (RANDOM_PRIORITY) {
     pcs.push({ rand()%20, { pc, ids }});
   } else {
-    pcs.push({ language_size(pc, 30), { pc, ids }});
+    int ell = upper_length(ids);
+    pcs.push({ language_size(pc, ell), { pc, ids }});
   }
   vector<Pattern> ret;
 
@@ -417,7 +425,8 @@ vector<Pattern> kmmg(int K)
       if (RANDOM_PRIORITY) {
         pcs.push({ rand()%20, { p_next, S }});
       } else {
-        pcs.push({ language_size(p_next, 30), { p_next, S }});
+        int ell = upper_length(S);
+        pcs.push({ language_size(p_next, ell), { p_next, S }});
       }
     }
 
@@ -565,7 +574,8 @@ DFA(const Pattern& p, int ell, bool DEBUG)
   return make_pair(dfa, n);
 }
 
-Integer language_size(const Pattern& p, int ell, bool DEBUG)
+inline
+Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
 {
   auto automata = DFA(p, ell, DEBUG);
   auto dfa = automata.first;
@@ -670,3 +680,27 @@ Integer language_size(const Pattern& p, int ell, bool DEBUG)
 
   return V[idx_final];
 }
+
+Integer language_size(const Pattern& p, int ell, bool DEBUG)
+{
+  const int n = p.size();
+  if (ell < n) return 0;
+  Integer ac = 1;
+  int i = 0,
+      j = n - 1;
+  for (; i <= j; ++i) {
+    if (p[i].t == VAR) break;
+    if (p[i].t == POS) { ac *= class_size[p[i].pos]; }
+    --ell;
+  }
+  for (; i <= j; --j) {
+    if (p[j].t == VAR) break;
+    if (p[j].t == POS) { ac *= class_size[p[j].pos]; }
+    --ell;
+  }
+  Pattern r;
+  for (; i <= j; ++i) r.push_back(p[i]);
+  if (r.size() == 0) return ac;
+  return ac * language_size_sub(r, ell, DEBUG);
+}
+

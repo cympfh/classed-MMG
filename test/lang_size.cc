@@ -68,11 +68,13 @@ int main(int argc, char*argv[])
   // 行くぜ
   {
     Pattern p = {
-      PUnit(),
       PUnit("A", "a"),
-      PUnit()
+      PUnit(),
+      PUnit("A"),
+      PUnit(),
+      PUnit("A")
     };
-    trace(DFA(p, 10, true));
+    trace(language_size(p, 6, true));
   }
 
   return 0;
