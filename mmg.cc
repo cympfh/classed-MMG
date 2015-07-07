@@ -383,6 +383,7 @@ vector<Pattern> kmmg(int K)
     auto tpl = pcs.top(); pcs.pop();
     auto& p = tpl.second.first;
     auto& c = tpl.second.second;
+    cerr << "# div: " << tpl.first << ": " << p << endl;
 
     // S = Doc - L(Pi - p)
     vi S;
@@ -666,6 +667,7 @@ Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
   // walking!
   vector<Integer> V(id, 0), U(id);
   V[idx_init] = 1;
+  Integer sum = 0;
 
   rep (_, ell) {
     rep (i, id) {
@@ -676,11 +678,14 @@ Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
       U[i] = ac;
     }
     V = U;
+    sum += V[idx_final];
   }
-
-  return V[idx_final];
+  return sum;
 }
 
+/*
+ * |L^{<= ell}(p)|
+ */
 Integer language_size(const Pattern& p, int ell, bool DEBUG)
 {
   const int n = p.size();

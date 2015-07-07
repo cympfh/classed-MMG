@@ -65,7 +65,6 @@ int main(int argc, char*argv[])
 
   init(docs, true);
 
-  // 行くぜ
   {
     Pattern p = {
       PUnit("A", "a"),
@@ -74,7 +73,16 @@ int main(int argc, char*argv[])
       PUnit(),
       PUnit("A")
     };
+    trace(p);
     trace(language_size(p, 6, true));
+  }
+
+  {
+    Pattern p = {
+      PUnit(), PUnit()
+    };
+    trace(p);
+    trace(language_size(p, 3, true));
   }
 
   return 0;
