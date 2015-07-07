@@ -62,16 +62,17 @@ int main(int argc, char*argv[])
       docs.push_back(text);
     }
   }
-  init(docs);
+
+  init(docs, true);
 
   // 行くぜ
   {
     Pattern p = {
       PUnit(),
-      PUnit(), PUnit("A", "a"), PUnit()
+      PUnit("A", "a"),
+      PUnit()
     };
-    test(p, 4);
-    DFA(p, 4, true);
+    trace(DFA(p, 10, true));
   }
 
   return 0;

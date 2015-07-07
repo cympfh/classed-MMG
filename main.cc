@@ -42,6 +42,9 @@ int main(int argc, char*argv[])
         K = str_to_int(string(argv[i+1]));
         if (DEBUG) trace(K);
       }
+      if (s == "-R") {
+        RANDOM_PRIORITY = true;
+      }
     }
   }
 

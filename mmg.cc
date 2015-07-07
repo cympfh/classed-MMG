@@ -336,7 +336,7 @@ Pattern var_simplify(Pattern&s) {
   return r;
 }
 
-void init(vector<Text>& _docs) {
+void init(vector<Text>& _docs, bool DEBUG) {
   docs = _docs;
 
   class_size.clear();
@@ -352,6 +352,12 @@ void init(vector<Text>& _docs) {
   for (const Alphabet& a: vocabulary) {
     class_size[a.pos]++;
   }
+
+  if (DEBUG) {
+    trace(alphabet_size);
+    for (auto&pr: class_size) trace(pr);
+  }
+
 }
 
 vector<Pattern> kmmg(int K)
@@ -367,8 +373,12 @@ vector<Pattern> kmmg(int K)
   vi cover_count(n, 1);
 
   // (num_of_fixed, Pattern, cover)
-  priority_queue<pair<int, pair<Pattern, vi>>> pcs;
-  pcs.push({ -num_of_fixed(pc), { pc, ids }});
+  priority_queue<pair<Integer, pair<Pattern, vi>>> pcs;
+  if (RANDOM_PRIORITY) {
+    pcs.push({ rand()%20, { pc, ids }});
+  } else {
+    pcs.push({ language_size(pc, 30), { pc, ids }});
+  }
   vector<Pattern> ret;
 
   /* division */
@@ -388,14 +398,12 @@ vector<Pattern> kmmg(int K)
 
     vector<pair<Pattern, vi>> pcs_next = division(p, S);
     if (pcs_next.size() < 2) { // not divisible
-      if (DEBUG) {
-        cerr << "a pattern " << p << " is not divisible" << endl;
-      }
+      if (DEBUG) { cerr << "a pattern " << p << " is not divisible" << endl; }
       ret.push_back(p);
       continue;
     }
 
-    if (ret.size() + pcs.size() + pcs_next.size() > K) { // over
+    if (ret.size() + pcs.size() + pcs_next.size() > K) {
       if (DEBUG) {
         cerr << "#pattern is over K=" << K << endl;
         trace(ret.size());
@@ -421,112 +429,64 @@ vector<Pattern> kmmg(int K)
         else --cover_count[i];
       }
       auto p_next = tighten(pc_next.first, S, true);
-      pcs.push({ -num_of_fixed(p_next), { p_next, S }});
+      if (RANDOM_PRIORITY) {
+        pcs.push({ rand()%20, { p_next, S }});
+      } else {
+        pcs.push({ language_size(p_next, 30), { p_next, S }});
+      }
     }
   }
   return ret;
 }
 
-Integer language_size_table[200][200];
-
-Integer language_size(Pattern&p, int ell, bool DEBUG=false)
+/*
+ * construct a NFA
+ * s.t.  L(NFA) = L(p)
+ *
+ * NFA nfa = vector<>;
+ * using state = int;
+ * nfa[state] = map<PUnit, vector<state>>
+ */
+inline
+vector<map<PUnit, vi>>
+NFA(const Pattern& p, int ell, bool DEBUG)
 {
-  // DP
-  assert(p.size() < 200);
-  assert(ell < 200);
-
-  const int n = p.size();
-  rep (i, ell) rep (j, n) language_size_table[i][j] = 0;
-
-  rep (i, ell) {
-    rep (j, n) {
-      if (i == 0 and j == 0) {
-        Integer r;
-        {
-          if (p[0].t == VAR) r = alphabet_size;
-          else if (p[0].t == POS) r = class_size[p[0].pos];
-          else r = 1;
-        }
-        language_size_table[0][0] = r;
-      }
-      else if (i == 0) {
-        language_size_table[0][j] = 0;
-      }
-      else if (j == 0) {
-        if (p[0].t == VAR) {
-          language_size_table[i][j] = language_size_table[i-1][j] * alphabet_size;
-        } else {
-          language_size_table[i][j] = 0;
-        }
-      }
-      else {
-        Integer r;
-        {
-          r = language_size_table[i-1][j-1];
-          if (p[j].t == VAR) r *= alphabet_size;
-          else if (p[j].t == POS) r *= class_size[p[j].pos];
-          if (i == 1 and j == 1) trace(p[j]);
-        }
-
-        Integer s = 0;
-        {
-          if (p[j].t == VAR) s = language_size_table[i-1][j] * alphabet_size;
-        }
-
-        language_size_table[i][j] = r + s;
-      }
-    }
-  }
-
-  if (DEBUG) {
-    rep (i, ell) {
-      rep (j, n) {
-        cout << language_size_table[i][j] << ' ';
-      } cout << endl;
-    }
-  }
-
-  return language_size_table[ell-1][n-1];
-}
-
-void DFA(Pattern&p, int ell, bool DEBUG=false)
-{
-
-  // NFA construction
   vector< map<PUnit, vi> > nfa(1); // nfa[state][alphabet] = { next states }
-  vector< vector<PUnit> > deg(1); // deg[state] = keys of nfa[state]
-
   int n = 0;
   for (const PUnit& a: p)
   {
     nfa[n][a].push_back( n+1 );
-    deg[n].push_back(a);
     nfa.push_back({});
-    deg.push_back({});
     if (a.t == VAR) {
       nfa[n+1][a].push_back( n+1 );
-      deg[n+1].push_back(a);
     }
     n++;
   }
-  n++;
-
-  // n == nfa.size()
-  // state #0 is the initial
-  // state #{n-1} is the final state.
-
   if (DEBUG) {
     for (int i = 0; i < nfa.size(); ++i) {
       cout << "#" << i << " " << nfa[i] << endl;
     }
   }
-  trace(n);
+  return nfa;
+}
 
-  using State = long long unsigned int;
+/*
+ * construct DFA (via NFA)
+ * s.t. L(DFA) = L(p)
+ */
+inline
+pair<
+  map<State, map<PUnit, State>>,
+  int
+>
+DFA(const Pattern& p, int ell, bool DEBUG)
+{
+  auto nfa = NFA(p, ell, DEBUG);
+  int n = nfa.size();
+  if (DEBUG) { trace(nfa.size()); }
+
   // bit で NFA State の集合を表現します.
   // 初期状態は0bit目だけ立ってるので 1 です.
-
-  if (DEBUG) { trace(nfa.size()); trace(8 * sizeof(State)); }
   assert (nfa.size() < 8*sizeof(State));
 
   map<State, map<PUnit, State>> dfa; // dfa[state][alphabet] = next state
@@ -542,16 +502,15 @@ void DFA(Pattern&p, int ell, bool DEBUG=false)
       if (visited[P]) continue;
 
       vector<int> states; // in NFA
-      {
-        for (int p = 0; p < n; ++p) {
-          if ((1 << p) & P) states.push_back(p);
-        }
+      for (int p = 0; p < n; ++p) { // P -> {p}
+        if ((1 << p) & P) states.push_back(p);
       }
 
       set<PUnit> readable_pos, readable_words;
       {
         for (int p: states) {
-          for (const PUnit& a: deg[p]) {
+          for (auto& pr: nfa[p]) {
+            const PUnit&a = pr.first;
             if (a.t == POS) { readable_pos.insert(a); }
             else if (a.t == WORD) { readable_words.insert(a); }
           }
@@ -613,5 +572,111 @@ void DFA(Pattern&p, int ell, bool DEBUG=false)
       visited[P] = true;
     }
   }
+  return make_pair(dfa, n);
+}
 
+Integer language_size(const Pattern& p, int ell, bool DEBUG)
+{
+  auto automata = DFA(p, ell, DEBUG);
+  auto dfa = automata.first;
+  const int n = automata.second;
+
+  // adjacency matrix of the DFA
+  int idx_init = -1,
+      idx_final = -1;
+  int id;
+  vvi M;
+  {
+    map<State, int> state_id; // re-numbering State
+    id = 0;
+    for (auto&pr: dfa) {
+      State P = pr.first;
+      if (state_id.count(P) > 0) continue;
+      if (P == 1) {
+        idx_init = id++;
+        state_id[P] = idx_init;
+      }
+      else if (P & (1 << (n-1))) {
+        if (idx_final < 0) {
+          idx_final = id++;
+        }
+        state_id[P] = idx_final;
+      }
+      else {
+        state_id[P] = id++;
+      }
+    }
+
+    if (DEBUG) {
+      cerr << "re-numbering DFA states" << endl;
+      for (auto&pr: state_id) {
+        cerr << "# " << d2b(pr.first, n) << " => " << pr.second << endl;
+      }
+    }
+
+    M.resize(id);
+    rep (i, id) M[i] = vi(id, 0);
+
+    { // count up alphabets
+      for (auto&pr: dfa)
+      {
+        State P = pr.first;
+        int state_of_P = state_id[P];
+        map<PUnit, State>& m = pr.second;
+
+        map<string, int> visited; // visited[POS]
+        int num_of_else = alphabet_size;
+
+        for (auto it = m.rbegin(); it != m.rend(); ++it) {
+          State Q = it->second;
+          int state_of_Q = state_id[Q];
+          if (it->first.t == WORD) {
+            M[state_of_P][state_of_Q] += 1;
+            visited[it->first.pos]++;
+            num_of_else--;
+          }
+          else if (it->first.t == POS) {
+            string pos = it->first.pos;
+            int x = max(0, class_size[pos] - visited[pos]);
+            M[state_of_P][state_of_Q] += x;
+            num_of_else -= x;
+          }
+          else { // <>
+            M[state_of_P][state_of_Q] += num_of_else;
+          }
+        }
+      }
+
+      rep (i, id) {
+        rep (j, id) {
+          M[i][j] = min(M[i][j], alphabet_size);
+        }
+      }
+
+      if (DEBUG) {
+        cerr << "M =" << endl;
+        rep (i, id) {
+          rep (j, id) { cerr << ' ' << M[i][j]; }
+          cerr << endl;
+        }
+      }
+    }
+  }
+
+  // walking!
+  vector<Integer> V(id, 0), U(id);
+  V[idx_init] = 1;
+
+  rep (_, ell) {
+    rep (i, id) {
+      Integer ac = 0;
+      rep (j, id) {
+        ac += V[j] * M[j][i];
+      }
+      U[i] = ac;
+    }
+    V = U;
+  }
+
+  return V[idx_final];
 }

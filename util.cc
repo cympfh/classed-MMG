@@ -52,6 +52,7 @@ int str_to_int(string s) {
 }
 
 using vi = vector<int>;
+using vvi = vector<vi>;
 
 template<typename T>
 string d2b(T s, int n) {
