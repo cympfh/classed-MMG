@@ -230,6 +230,8 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     n = p.size(),
     M = c.size();
 
+  if (DEBUG) { cerr << "# division of " << p << ", " << c << endl; }
+
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
     set<Alphabet> s = alphabets(c);
@@ -297,7 +299,9 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
           for (int j = i + 1; j < cspc.size(); ++j) cspc[j].second.erase(id);
         }
       }
-      div.push_back({ cspc[i].first, v });
+      Pattern& p = cspc[i].first;
+      p = tighten(p, v); // ここでついでに tightest にしておこう
+      div.push_back({ p, v });
       ++i;
     }
   }
@@ -305,7 +309,7 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
   if (DEBUG) {
     cerr << "# division of " << p << endl;
     cerr << "following " << div.size() << " patterns" << endl;
-    for (auto& p: div) cerr << " -- " << p.first << endl;
+    for (auto& p: div) cerr << " -- " << p.first << " where " << p.second << endl;
   }
 
   return div;
@@ -381,32 +385,23 @@ vector<Pattern> kmmg(int K)
   while (not pcs.empty())
   {
     auto tpl = pcs.top(); pcs.pop();
-    auto& p = tpl.second.first;
-    auto& c = tpl.second.second;
-    cerr << "# div: " << tpl.first << ": " << p << endl;
+    Pattern& p = tpl.second.first;
+    vi& c = tpl.second.second;
 
-    // S = Doc - L(Pi - p)
-    vi S;
-    for (int i: c) {
-      if (cover_count[i] == 1) S.push_back(i);
-      --cover_count[i];
-    }
-    if (S.size() == 0) continue;
-
-    vector<pair<Pattern, vi>> pcs_next = division(p, S);
+    vector<pair<Pattern, vi>> dPC = division(p, c);
 
     // when not divisible
-    if (pcs_next.size() < 2) {
+    if (dPC.size() < 2) {
       if (DEBUG) { cerr << "a pattern " << p << " is not divisible" << endl; }
       ret.push_back(p);
       continue;
     }
 
     // when |P| > K
-    if (ret.size() + pcs.size() + pcs_next.size() > K) {
+    if (ret.size() + pcs.size() + dPC.size() > K) {
       if (DEBUG) {
         cerr << "#pattern is over K=" << K << endl;
-        trace(ret.size()); trace(pcs.size()); trace(pcs_next.size());
+        trace(ret.size()); trace(pcs.size()); trace(dPC.size());
       }
       ret.push_back(p);
       while (not pcs.empty()) {
@@ -416,23 +411,19 @@ vector<Pattern> kmmg(int K)
       return ret;
     }
 
-    for (auto&pc_next: pcs_next) {
-      // Doc - (Pi - pc_next)
-      vi S;
-      for (int i: pc_next.second) {
-        if (cover_count[i] == 0) S.push_back(i);
-      }
-      auto p_next = tighten(pc_next.first, S);
+    int ell = upper_length(c);
+    for (auto& qc: dPC) {
+      Pattern& q = qc.first;
       if (RANDOM_PRIORITY) {
-        pcs.push({ rand()%20, { p_next, S }});
+        pcs.push({ rand()%20, { q, qc.second }});
       } else {
-        int ell = upper_length(S);
-        pcs.push({ language_size(p_next, ell), { p_next, S }});
+        pcs.push({ language_size(q, ell), { q, qc.second }});
       }
     }
 
-    for (auto&pc_next: pcs_next) {
-      for (int i: pc_next.second) ++cover_count[i];
+    // update counter
+    for (auto& qc: dPC) {
+      for (int i: qc.second) ++cover_count[i];
     }
 
   }
