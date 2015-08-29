@@ -62,7 +62,7 @@ int main(int argc, char*argv[])
   }
 
   // dassee
-  init(docs);
+  init(docs, DEBUG);
 
   // 行くぜ
   auto result = kmmg(K);

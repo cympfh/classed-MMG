@@ -1,5 +1,4 @@
 #include "util.cc"
-#include <gmpxx.h>
 #include "mmg.hh"
 using namespace std;
 
@@ -60,11 +59,6 @@ ostream& operator<<(ostream& os, PUnit r) {
   }
 }
 
-int num_of_fixed(Pattern& p) {
-  int n = 0;
-  for (auto&u: p)
-    if (u.t != VAR) ++n;
-}
 
 struct Alphabet {
   string word;
@@ -88,13 +82,17 @@ ostream& operator<<(ostream& os, const Alphabet& a) {
   return os << a.word << '/' << a.pos;
 }
 
-/* non-erasing generalization system <= */
+
+/*
+ * non-erasing generalization system <=
+ */
 
 bool preceq(Alphabet& a, PUnit& u) {
   if (u.t == VAR) return true;
   if (u.t == POS) return a.pos == u.pos;
   return a.pos == u.pos and a.word == u.word;
 }
+
 
 bool preceq_table[2000][2000];
 bool preceq(Text& s, Pattern& p) {
@@ -131,12 +129,14 @@ bool preceq(Text& s, Pattern& p) {
   return preceq_table[n-1][m-1];
 }
 
+
 // S subseteq L(p); S = { docs[i] : i <- c }
 bool language_include(vi&c, Pattern&p) {
   for (int i: c)
     if (not preceq(docs[i], p)) return false;
   return true;
 }
+
 
 // S cap L(p); S = { docs[i] : i <- c }
 vi cover(Pattern&p, vi&c) {
@@ -153,6 +153,7 @@ set<int> coverset(Pattern&p, vi&c) {
   return s;
 }
 
+
 // { a : a <- docs[i], i <- c }
 // gather all alphabets using in `c`
 set<Alphabet> alphabets(vi&c) {
@@ -165,6 +166,7 @@ set<Alphabet> alphabets(vi&c) {
   return s;
 }
 
+
 // max |s| : s <- docs[i], i <- c
 int upper_length(const vi& c) {
   int r = 0;
@@ -172,11 +174,13 @@ int upper_length(const vi& c) {
   return r;
 }
 
+
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
 Pattern tighten(Pattern p, vi&c)
 {
   const int n = p.size();
+  assert(c.size() > 0);
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
@@ -224,6 +228,28 @@ Pattern tighten(Pattern p, vi&c)
   return p; // final
 }
 
+
+Pattern tighten(Pattern p, set<int> c) {
+  vi v;
+  for (int i: c) v.push_back(i);
+  return tighten(p, v);
+}
+
+
+/*
+ * 最小被覆を貪欲にするための優先度
+ * 被覆サイズが大きいパターンに大きな値を与える
+ * でも #L が大きい物には少し小さくさせたい
+ */
+inline
+Integer priority(const Pattern& p, int ell, const set<int>& cover) {
+  Integer r = cover.size();
+  Integer c = language_size(p, ell);
+  // cerr << "priority=" << (make_tuple(p, (r), make_pair(c, ell)))<<endl;
+  return r;
+}
+
+
 vector<pair<Pattern, vi>> division(Pattern p, vi&c)
 {
   const int
@@ -240,7 +266,8 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     }
   }
 
-  vector<pair<Pattern, set<int>>> cspc; 
+  vector<pair<Integer, pair<Pattern, set<int>>>> cspc; 
+  int ell = upper_length(c);
   rep (i, n) {
     // <A> -> a/A
     if (p[i].t == POS) {
@@ -248,7 +275,12 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
       p[i].t = WORD;
       for (string&w: dict[pos]) {
         p[i].word = w;
-        cspc.push_back({ p, coverset(p, c) });
+        auto s = coverset(p, c);
+        if (s.size() > 0) {
+          Pattern r = tighten(p, s);
+          Integer pr = priority(r, ell, s);
+          cspc.push_back({ pr, { r, s }});
+        }
       }
       p[i].t = WORD;
     }
@@ -258,7 +290,12 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
       p[i].t = POS;
       for (auto&pr: dict) {
         p[i].pos = pr.first;
-        cspc.push_back({ p, coverset(p, c) });
+        auto s = coverset(p, c);
+        if (s.size() > 0) {
+          Pattern r = tighten(p, s);
+          Integer pr = priority(r, ell, s);
+          cspc.push_back({ pr, { r, s }});
+        }
       }
       p[i].t = VAR;
     }
@@ -272,8 +309,22 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     if (p[i].t == VAR) {
       q[i+1] = PUnit();
       for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
-      cspc.push_back({ q, coverset(q, c) });
+      // cspc.push_back({ q, coverset(q, c) });
+      auto s = coverset(q, c);
+      if (s.size() > 0) {
+        Pattern r = tighten(p, s);
+        Integer pr = priority(r, ell, s);
+        cspc.push_back({ pr, { r, s }});
+      }
     }
+  }
+
+  if (DEBUG) {
+    cerr << "--- cspc" << endl;
+    for (auto& a: cspc) {
+      cerr << a << endl;
+    }
+    cerr << "---" << endl;
   }
 
   vector<pair<Pattern, vi>> div;
@@ -282,8 +333,10 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     return div;
   }
 
-  auto sort_by_setsize = [](pair<Pattern, set<int>> x, pair<Pattern, set<int>> y) {
-    return x.second.size() > y.second.size();
+  auto sort_by_setsize = [](
+      const pair<Integer, pair<Pattern, set<int>>>& x,
+      const pair<Integer, pair<Pattern, set<int>>>& y) {
+    return x.first > y.first;
   };
 
   { // 貪欲に近似の最小集合被覆
@@ -291,29 +344,32 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     set<int> m;
     while (m.size() < M) {
       sort(cspc.begin() + i, cspc.end(), sort_by_setsize);
-      vi v;
-      for (int id: cspc[i].second) {
-        v.push_back(id);
-        if (m.count(id) == 0) {
-          m.insert(id);
-          for (int j = i + 1; j < cspc.size(); ++j) cspc[j].second.erase(id);
+      if (cspc[i].second.second.size() > 0) {
+        vi v;
+        for (int id: cspc[i].second.second) {
+          v.push_back(id);
+          if (m.count(id) == 0) {
+            m.insert(id);
+            for (int j = i + 1; j < cspc.size(); ++j) cspc[j].second.second.erase(id);
+          }
         }
+        Pattern& p = cspc[i].second.first;
+        // cerr << "tighten of " << p << " where " << v << endl;
+        p = tighten(p, v); // ここでついでに tightest にしておこう
+        div.push_back({ p, v });
       }
-      Pattern& p = cspc[i].first;
-      p = tighten(p, v); // ここでついでに tightest にしておこう
-      div.push_back({ p, v });
       ++i;
     }
   }
 
   if (DEBUG) {
-    cerr << "# division of " << p << endl;
     cerr << "following " << div.size() << " patterns" << endl;
     for (auto& p: div) cerr << " -- " << p.first << " where " << p.second << endl;
   }
 
   return div;
 }
+
 
 // <> <>* -> <>
 Pattern var_simplify(Pattern&s) {
@@ -334,6 +390,7 @@ Pattern var_simplify(Pattern&s) {
   }
   return r;
 }
+
 
 void init(vector<Text>& _docs, bool DEBUG) {
   docs = _docs;
@@ -359,6 +416,7 @@ void init(vector<Text>& _docs, bool DEBUG) {
 
 }
 
+
 vector<Pattern> kmmg(int K)
 {
   const int n = docs.size();
@@ -371,14 +429,9 @@ vector<Pattern> kmmg(int K)
   // いくつのパターンに被覆されているか
   vi cover_count(n, 1);
 
-  // (num_of_fixed, Pattern, cover)
+  // (priority, Pattern, cover)
   priority_queue<pair<Integer, pair<Pattern, vi>>> pcs;
-  if (RANDOM_PRIORITY) {
-    pcs.push({ rand()%20, { pc, ids }});
-  } else {
-    int ell = upper_length(ids);
-    pcs.push({ language_size(pc, ell), { pc, ids }});
-  }
+  pcs.push({ 1, { pc, ids }});
   vector<Pattern> ret;
 
   /* division */
@@ -411,13 +464,14 @@ vector<Pattern> kmmg(int K)
       return ret;
     }
 
-    int ell = upper_length(c);
     for (auto& qc: dPC) {
       Pattern& q = qc.first;
       if (RANDOM_PRIORITY) {
         pcs.push({ rand()%20, { q, qc.second }});
       } else {
-        pcs.push({ language_size(q, ell), { q, qc.second }});
+        int ell = upper_length(qc.second);
+        Integer pr = log(language_size(q, ell));
+        pcs.push({ pr, { q, qc.second }});
       }
     }
 
@@ -429,6 +483,7 @@ vector<Pattern> kmmg(int K)
   }
   return ret;
 }
+
 
 /*
  * construct a NFA
@@ -460,6 +515,7 @@ NFA(const Pattern& p, int ell, bool DEBUG)
   }
   return nfa;
 }
+
 
 /*
  * construct DFA (via NFA)
@@ -565,6 +621,7 @@ DFA(const Pattern& p, int ell, bool DEBUG)
   }
   return make_pair(dfa, n);
 }
+
 
 inline
 Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
@@ -674,6 +731,7 @@ Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
   return sum;
 }
 
+
 /*
  * |L^{<= ell}(p)|
  */
@@ -684,11 +742,13 @@ Integer language_size(const Pattern& p, int ell, bool DEBUG)
   Integer ac = 1;
   int i = 0,
       j = n - 1;
+  // remove head (a, <A>)
   for (; i <= j; ++i) {
     if (p[i].t == VAR) break;
     if (p[i].t == POS) { ac *= class_size[p[i].pos]; }
     --ell;
   }
+  // remove tail (a, <A>)
   for (; i <= j; --j) {
     if (p[j].t == VAR) break;
     if (p[j].t == POS) { ac *= class_size[p[j].pos]; }
@@ -699,4 +759,5 @@ Integer language_size(const Pattern& p, int ell, bool DEBUG)
   if (r.size() == 0) return ac;
   return ac * language_size_sub(r, ell, DEBUG);
 }
+
 
