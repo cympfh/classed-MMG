@@ -87,15 +87,84 @@ ostream& operator<<(ostream& os, const Alphabet& a) {
  * non-erasing generalization system <=
  */
 
-bool preceq(Alphabet& a, PUnit& u) {
+bool preceq(const Alphabet& a, const PUnit& u) {
   if (u.t == VAR) return true;
   if (u.t == POS) return a.pos == u.pos;
   return a.pos == u.pos and a.word == u.word;
 }
 
+bool preceq(const Text& s, const Pattern& p, bool DEBUG) {
+  int n = s.size();
+  int m = p.size();
+  if (n < m) return false;
 
+  // tail matching
+  while (m > 0 and p[m-1].t != VAR) {
+    if (preceq(s[n-1], p[m-1])) {
+      --n; --m;
+    } else {
+      return false;
+    }
+  }
+  if (n == 0 and m == 0) return true;
+  if (m == 0) return false;
+
+  // p should be "<>[.<>]*<>" or "[.<>]*<>"
+
+  int __pos = 0; // of text
+  int __begin = 0; // of pattern
+
+  // head matching
+  while (p[__begin].t != VAR) {
+    if (preceq(s[__pos], p[__begin])) {
+      ++__pos; ++__begin;
+    } else {
+      return false;
+    }
+    if (__pos >= n) return false;
+  }
+
+  // p should be "<>[.<>]*<>"
+  
+  int __end;
+  for (;;) {
+    while (__begin < m and p[__begin].t == VAR) {
+      ++__pos; ++__begin;
+    }
+    if (__begin >= m) return true;
+    if (__pos >= n) return false;
+
+    for (__end = __begin + 1; __end < m; ++__end)
+      if (p[__end].t == VAR) break;
+
+    if (DEBUG) {
+      cerr << "pos, begin, end = "
+        << __pos << ' '
+        << __begin << ' '
+        << __end << endl;
+    }
+
+    for (; __pos < n - (__end - __begin); ++__pos) {
+      bool res = true;
+      for (int i = 0; i < __end - __begin; ++i) {
+        if (not preceq(s[__pos + i], p[__begin + i])) {
+          res = false;
+          break;
+        }
+      }
+      if (res) {
+        __pos = (__end - __begin);
+        __begin = __end;
+        break;
+      }
+    }
+    if (__pos >= n - (__end - __begin)) return false;
+  }
+}
+
+/* DP version is slow ??? */
 bool preceq_table[2000][2000];
-bool preceq(Text& s, Pattern& p) {
+bool DP_preceq(Text& s, Pattern& p) {
   const int
     n = s.size(),
     m = p.size();

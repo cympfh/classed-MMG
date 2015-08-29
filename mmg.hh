@@ -11,7 +11,7 @@ map<string, int> class_size;
 set<Alphabet> vocabulary;
 // set<string> pos_vocabulary;
 
-bool preceq(Text&, Pattern&);
+bool preceq(const Text&, const Pattern&, bool=false);
 void init(vector<Text>&_docs, bool=false);
 vector<Pattern> kmmg(int K);
 
