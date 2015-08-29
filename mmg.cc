@@ -127,11 +127,11 @@ bool preceq(const Text& s, const Pattern& p, bool DEBUG) {
   // p should be "<>[.<>]*<>"
   
   int __end;
-  for (;;) {
+  for (int i = p.size();i > 0; --i) {
     while (__begin < m and p[__begin].t == VAR) {
       ++__pos; ++__begin;
     }
-    if (__begin >= m) return true;
+    if (__begin >= m and __pos <= n) return true;
     if (__pos >= n) return false;
 
     for (__end = __begin + 1; __end < m; ++__end)
@@ -153,18 +153,19 @@ bool preceq(const Text& s, const Pattern& p, bool DEBUG) {
         }
       }
       if (res) {
-        __pos = (__end - __begin);
+        __pos += (__end - __begin);
         __begin = __end;
         break;
       }
     }
     if (__pos >= n - (__end - __begin)) return false;
   }
+  return false;
 }
 
 /* DP version is slow ??? */
 bool preceq_table[2000][2000];
-bool DP_preceq(Text& s, Pattern& p) {
+bool DP_preceq(const Text& s, const Pattern& p) {
   const int
     n = s.size(),
     m = p.size();
@@ -198,14 +199,12 @@ bool DP_preceq(Text& s, Pattern& p) {
   return preceq_table[n-1][m-1];
 }
 
-
 // S subseteq L(p); S = { docs[i] : i <- c }
 bool language_include(vi&c, Pattern&p) {
   for (int i: c)
     if (not preceq(docs[i], p)) return false;
   return true;
 }
-
 
 // S cap L(p); S = { docs[i] : i <- c }
 vi cover(Pattern&p, vi&c) {
@@ -399,9 +398,11 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
   vector<pair<Pattern, vi>> div;
 
   if (cspc.size() == 0) {
+    if (DEBUG) { cerr << "cspc.size() == 0" << endl; }
     return div;
   }
 
+  const
   auto sort_by_setsize = [](
       const pair<Integer, pair<Pattern, set<int>>>& x,
       const pair<Integer, pair<Pattern, set<int>>>& y) {
@@ -804,7 +805,25 @@ Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
 /*
  * |L^{<= ell}(p)|
  */
-Integer language_size(const Pattern& p, int ell, bool DEBUG)
+Integer language_size(const Pattern& p, int ell, bool DEBUG) // about
+{
+  Integer ret = 1;
+  for (auto&u: p) {
+    if (u.t == WORD) --ell;
+    else if (u.t == POS) {
+      --ell;
+      ret *= class_size[u.pos];
+    }
+  }
+  while (ell > 0) {
+    --ell;
+    ret *= alphabet_size;
+  }
+  return ret;
+}
+
+/*
+Integer language_size(const Pattern& p, int ell, bool DEBUG) // exact
 {
   const int n = p.size();
   if (ell < n) return 0;
@@ -828,5 +847,5 @@ Integer language_size(const Pattern& p, int ell, bool DEBUG)
   if (r.size() == 0) return ac;
   return ac * language_size_sub(r, ell, DEBUG);
 }
-
+*/
 

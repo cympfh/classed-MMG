@@ -1,7 +1,5 @@
-mmg.o: mmg.cc
-	g++ -c -O3 -std=c++11 -o $@ mmg.cc -lgmp -lgmpxx
-
-do: mmg
+test: mmg
+	cat sample-input
 	./mmg -D -K 2 < sample-input
 
 mmg: util.cc mmg.cc main.cc

@@ -28,6 +28,11 @@ int main(int argc, char*argv[])
   }
 
   {
+    Text t = { Alphabet("A", "a"), Alphabet("B", "b"), Alphabet("C", "c"), Alphabet("D", "d") };
+    assert(not preceq(t, { PUnit(), PUnit("C"), PUnit(), PUnit() }, true));
+  }
+
+  {
     Text t = {
       Alphabet("A", "a"), Alphabet("B", "b"),
       Alphabet("A", "a"), Alphabet("B", "b"),
@@ -52,6 +57,7 @@ int main(int argc, char*argv[])
     assert(not preceq(t, { PUnit(), PUnit("A"), PUnit("B"), PUnit("B") }));
     assert(not preceq(t, { PUnit("B"), PUnit(), PUnit("A"), PUnit("B") }));
     assert(not preceq(t, { PUnit("A"), PUnit("B"), PUnit(), PUnit("A"), PUnit("B"), PUnit("A"), PUnit("B") }));
+
   }
 
   {
