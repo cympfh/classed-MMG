@@ -82,6 +82,12 @@ ostream& operator<<(ostream& os, const Alphabet& a) {
   return os << a.word << '/' << a.pos;
 }
 
+double abstract(const Pattern& p) {
+  double n = p.size();
+  int m = 0;
+  for (auto& u: p) if (u.t == VAR) ++m;
+  return double(m) / n;
+}
 
 /*
  * non-erasing generalization system <=
@@ -487,7 +493,7 @@ void init(vector<Text>& _docs, bool DEBUG) {
 }
 
 
-vector<Pattern> kmmg(int K)
+vector<Pattern> kmmg(Mode mode, int K, double rho)
 {
   const int n = docs.size();
 
@@ -520,18 +526,29 @@ vector<Pattern> kmmg(int K)
       continue;
     }
 
-    // when |P| > K
-    if (ret.size() + pcs.size() + dPC.size() > K) {
-      if (DEBUG) {
-        cerr << "#pattern is over K=" << K << endl;
-        trace(ret.size()); trace(pcs.size()); trace(dPC.size());
+    if (mode == KMULTIPLE) {
+      // when |P| > K
+      if (ret.size() + pcs.size() + dPC.size() > K) {
+        if (DEBUG) {
+          cerr << "#pattern is over K=" << K << endl;
+          trace(ret.size()); trace(pcs.size()); trace(dPC.size());
+        }
+        ret.push_back(p);
+        while (not pcs.empty()) {
+          ret.push_back(pcs.top().second.first);
+          pcs.pop();
+        }
+        return ret;
       }
-      ret.push_back(p);
-      while (not pcs.empty()) {
-        ret.push_back(pcs.top().second.first);
-        pcs.pop();
+    }
+
+    if (mode == ABSTRACTION) {
+      bool ok = true;
+      for (auto& qc: dPC) if (abstract(qc.first) < rho) { ok = false; break; }
+      if (not ok) {
+        ret.push_back(p);
+        continue;
       }
-      return ret;
     }
 
     for (auto& qc: dPC) {
