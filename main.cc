@@ -47,6 +47,9 @@ int main(int argc, char*argv[])
         sin >> rho;
         mode = ABSTRACTION;
       }
+      if (s == "-A") {
+        all_output = true;
+      }
       if (s == "-R") {
         RANDOM_PRIORITY = true;
       }

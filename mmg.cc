@@ -248,6 +248,16 @@ int upper_length(const vi& c) {
   return r;
 }
 
+vector<string> priority_pos = {
+  "VB", "VBD", "VBG", "VBN", "VBP", "VBZ",
+  "NN",
+  "IN"
+};
+
+set<string> stoppos = {
+  "DT",
+  "JJ", "JJR", "JJS"
+};
 
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
@@ -264,26 +274,34 @@ Pattern tighten(Pattern p, vi&c)
     }
   }
 
-  rep (i, n) {
+  rep (i, n)
+  {
+    // <> -> <A>
+    if (p[i].t == VAR) {
+      p[i].t = POS;
+      for (string& pos: priority_pos) {
+        if (not dict.count(pos)) continue;
+        p[i].pos = pos;
+        if (language_include(c, p)) return tighten(p, c);
+      }
+      for (auto&pr: dict) {
+        if (pr.first == "CD") continue;
+        p[i].pos = pr.first;
+        if (language_include(c, p)) return tighten(p, c);
+      }
+      p[i].t = VAR;
+    }
+
     // <A> -> a/A
     if (p[i].t == POS) {
       string pos = p[i].pos;
+      if (stoppos.count(pos)) continue;
       p[i].t = WORD;
       for (string&w: dict[pos]) {
         p[i].word = w;
         if (language_include(c, p)) return tighten(p, c);
       }
       p[i].t = POS;
-    }
-
-    // <> -> <A>
-    if (p[i].t == VAR) {
-      p[i].t = POS;
-      for (auto&pr: dict) {
-        p[i].pos = pr.first;
-        if (language_include(c, p)) return tighten(p, c);
-      }
-      p[i].t = VAR;
     }
   }
 
@@ -542,11 +560,17 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
       }
     }
 
+    if (all_output) {
+      ret.push_back(p);
+    }
+
     if (mode == ABSTRACTION) {
       bool ok = true;
       for (auto& qc: dPC) if (abstract(qc.first) < rho) { ok = false; break; }
       if (not ok) {
-        ret.push_back(p);
+        for (auto& qc: dPC) {
+          ret.push_back(qc.first);
+        }
         continue;
       }
     }
