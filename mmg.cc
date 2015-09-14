@@ -1,5 +1,4 @@
 #include "util.cc"
-#include <gmpxx.h>
 #include "mmg.hh"
 using namespace std;
 
@@ -60,11 +59,6 @@ ostream& operator<<(ostream& os, PUnit r) {
   }
 }
 
-int num_of_fixed(Pattern& p) {
-  int n = 0;
-  for (auto&u: p)
-    if (u.t != VAR) ++n;
-}
 
 struct Alphabet {
   string word;
@@ -88,16 +82,96 @@ ostream& operator<<(ostream& os, const Alphabet& a) {
   return os << a.word << '/' << a.pos;
 }
 
-/* non-erasing generalization system <= */
+double abstract(const Pattern& p) {
+  double n = p.size();
+  int m = 0;
+  for (auto& u: p) if (u.t == VAR) ++m;
+  return double(m) / n;
+}
 
-bool preceq(Alphabet& a, PUnit& u) {
+/*
+ * non-erasing generalization system <=
+ */
+
+bool preceq(const Alphabet& a, const PUnit& u) {
   if (u.t == VAR) return true;
   if (u.t == POS) return a.pos == u.pos;
   return a.pos == u.pos and a.word == u.word;
 }
 
+bool preceq(const Text& s, const Pattern& p, bool DEBUG) {
+  int n = s.size();
+  int m = p.size();
+  if (n < m) return false;
+
+  // tail matching
+  while (m > 0 and p[m-1].t != VAR) {
+    if (preceq(s[n-1], p[m-1])) {
+      --n; --m;
+    } else {
+      return false;
+    }
+  }
+  if (n == 0 and m == 0) return true;
+  if (m == 0) return false;
+
+  // p should be "<>[.<>]*<>" or "[.<>]*<>"
+
+  int __pos = 0; // of text
+  int __begin = 0; // of pattern
+
+  // head matching
+  while (p[__begin].t != VAR) {
+    if (preceq(s[__pos], p[__begin])) {
+      ++__pos; ++__begin;
+    } else {
+      return false;
+    }
+    if (__pos >= n) return false;
+  }
+
+  // p should be "<>[.<>]*<>"
+  
+  int __end;
+  for (int i = p.size();i > 0; --i) {
+    while (__begin < m and p[__begin].t == VAR) {
+      ++__pos; ++__begin;
+    }
+    if (__begin >= m and __pos <= n) return true;
+    if (__pos >= n) return false;
+
+    for (__end = __begin + 1; __end < m; ++__end)
+      if (p[__end].t == VAR) break;
+
+    if (DEBUG) {
+      cerr << "pos, begin, end = "
+        << __pos << ' '
+        << __begin << ' '
+        << __end << endl;
+    }
+
+    for (; __pos < n - (__end - __begin); ++__pos) {
+      bool res = true;
+      for (int i = 0; i < __end - __begin; ++i) {
+        if (not preceq(s[__pos + i], p[__begin + i])) {
+          res = false;
+          break;
+        }
+      }
+      if (res) {
+        __pos += (__end - __begin);
+        __begin = __end;
+        break;
+      }
+    }
+    if (__pos >= n - (__end - __begin)) return false;
+  }
+  return false;
+}
+
+/* DP version is slow ??? */
 bool preceq_table[2000][2000];
-bool preceq(Text& s, Pattern& p) {
+bool DP_preceq(const Text& s, const Pattern& p) {
   const int
     n = s.size(),
     m = p.size();
@@ -153,6 +227,7 @@ set<int> coverset(Pattern&p, vi&c) {
   return s;
 }
 
+
 // { a : a <- docs[i], i <- c }
 // gather all alphabets using in `c`
 set<Alphabet> alphabets(vi&c) {
@@ -165,6 +240,7 @@ set<Alphabet> alphabets(vi&c) {
   return s;
 }
 
+
 // max |s| : s <- docs[i], i <- c
 int upper_length(const vi& c) {
   int r = 0;
@@ -172,11 +248,23 @@ int upper_length(const vi& c) {
   return r;
 }
 
+vector<string> priority_pos = {
+  "VB", "VBD", "VBG", "VBN", "VBP", "VBZ",
+  "NN",
+  "IN"
+};
+
+set<string> stoppos = {
+  "DT",
+  "JJ", "JJR", "JJS"
+};
+
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
 Pattern tighten(Pattern p, vi&c)
 {
   const int n = p.size();
+  assert(c.size() > 0);
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
@@ -186,26 +274,34 @@ Pattern tighten(Pattern p, vi&c)
     }
   }
 
-  rep (i, n) {
+  rep (i, n)
+  {
+    // <> -> <A>
+    if (p[i].t == VAR) {
+      p[i].t = POS;
+      for (string& pos: priority_pos) {
+        if (not dict.count(pos)) continue;
+        p[i].pos = pos;
+        if (language_include(c, p)) return tighten(p, c);
+      }
+      for (auto&pr: dict) {
+        if (pr.first == "CD") continue;
+        p[i].pos = pr.first;
+        if (language_include(c, p)) return tighten(p, c);
+      }
+      p[i].t = VAR;
+    }
+
     // <A> -> a/A
     if (p[i].t == POS) {
       string pos = p[i].pos;
+      if (stoppos.count(pos)) continue;
       p[i].t = WORD;
       for (string&w: dict[pos]) {
         p[i].word = w;
         if (language_include(c, p)) return tighten(p, c);
       }
       p[i].t = POS;
-    }
-
-    // <> -> <A>
-    if (p[i].t == VAR) {
-      p[i].t = POS;
-      for (auto&pr: dict) {
-        p[i].pos = pr.first;
-        if (language_include(c, p)) return tighten(p, c);
-      }
-      p[i].t = VAR;
     }
   }
 
@@ -224,11 +320,35 @@ Pattern tighten(Pattern p, vi&c)
   return p; // final
 }
 
+
+Pattern tighten(Pattern p, set<int> c) {
+  vi v;
+  for (int i: c) v.push_back(i);
+  return tighten(p, v);
+}
+
+
+/*
+ * 最小被覆を貪欲にするための優先度
+ * 被覆サイズが大きいパターンに大きな値を与える
+ * でも #L が大きい物には少し小さくさせたい
+ */
+inline
+Integer priority(const Pattern& p, int ell, const set<int>& cover) {
+  Integer r = cover.size();
+  Integer c = language_size(p, ell);
+  // cerr << "priority=" << (make_tuple(p, (r), make_pair(c, ell)))<<endl;
+  return r;
+}
+
+
 vector<pair<Pattern, vi>> division(Pattern p, vi&c)
 {
   const int
     n = p.size(),
     M = c.size();
+
+  if (DEBUG) { cerr << "# division of " << p << ", " << c << endl; }
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
@@ -238,7 +358,8 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     }
   }
 
-  vector<pair<Pattern, set<int>>> cspc; 
+  vector<pair<Integer, pair<Pattern, set<int>>>> cspc; 
+  int ell = upper_length(c);
   rep (i, n) {
     // <A> -> a/A
     if (p[i].t == POS) {
@@ -246,7 +367,12 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
       p[i].t = WORD;
       for (string&w: dict[pos]) {
         p[i].word = w;
-        cspc.push_back({ p, coverset(p, c) });
+        auto s = coverset(p, c);
+        if (s.size() > 0) {
+          Pattern r = tighten(p, s);
+          Integer pr = priority(r, ell, s);
+          cspc.push_back({ pr, { r, s }});
+        }
       }
       p[i].t = WORD;
     }
@@ -256,7 +382,12 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
       p[i].t = POS;
       for (auto&pr: dict) {
         p[i].pos = pr.first;
-        cspc.push_back({ p, coverset(p, c) });
+        auto s = coverset(p, c);
+        if (s.size() > 0) {
+          Pattern r = tighten(p, s);
+          Integer pr = priority(r, ell, s);
+          cspc.push_back({ pr, { r, s }});
+        }
       }
       p[i].t = VAR;
     }
@@ -270,18 +401,36 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     if (p[i].t == VAR) {
       q[i+1] = PUnit();
       for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
-      cspc.push_back({ q, coverset(q, c) });
+      // cspc.push_back({ q, coverset(q, c) });
+      auto s = coverset(q, c);
+      if (s.size() > 0) {
+        Pattern r = tighten(p, s);
+        Integer pr = priority(r, ell, s);
+        cspc.push_back({ pr, { r, s }});
+      }
     }
+  }
+
+  if (DEBUG) {
+    cerr << "--- cspc" << endl;
+    for (auto& a: cspc) {
+      cerr << a << endl;
+    }
+    cerr << "---" << endl;
   }
 
   vector<pair<Pattern, vi>> div;
 
   if (cspc.size() == 0) {
+    if (DEBUG) { cerr << "cspc.size() == 0" << endl; }
     return div;
   }
 
-  auto sort_by_setsize = [](pair<Pattern, set<int>> x, pair<Pattern, set<int>> y) {
-    return x.second.size() > y.second.size();
+  const
+  auto sort_by_setsize = [](
+      const pair<Integer, pair<Pattern, set<int>>>& x,
+      const pair<Integer, pair<Pattern, set<int>>>& y) {
+    return x.first > y.first;
   };
 
   { // 貪欲に近似の最小集合被覆
@@ -289,27 +438,32 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
     set<int> m;
     while (m.size() < M) {
       sort(cspc.begin() + i, cspc.end(), sort_by_setsize);
-      vi v;
-      for (int id: cspc[i].second) {
-        v.push_back(id);
-        if (m.count(id) == 0) {
-          m.insert(id);
-          for (int j = i + 1; j < cspc.size(); ++j) cspc[j].second.erase(id);
+      if (cspc[i].second.second.size() > 0) {
+        vi v;
+        for (int id: cspc[i].second.second) {
+          v.push_back(id);
+          if (m.count(id) == 0) {
+            m.insert(id);
+            for (int j = i + 1; j < cspc.size(); ++j) cspc[j].second.second.erase(id);
+          }
         }
+        Pattern& p = cspc[i].second.first;
+        // cerr << "tighten of " << p << " where " << v << endl;
+        p = tighten(p, v); // ここでついでに tightest にしておこう
+        div.push_back({ p, v });
       }
-      div.push_back({ cspc[i].first, v });
       ++i;
     }
   }
 
   if (DEBUG) {
-    cerr << "# division of " << p << endl;
     cerr << "following " << div.size() << " patterns" << endl;
-    for (auto& p: div) cerr << " -- " << p.first << endl;
+    for (auto& p: div) cerr << " -- " << p.first << " where " << p.second << endl;
   }
 
   return div;
 }
+
 
 // <> <>* -> <>
 Pattern var_simplify(Pattern&s) {
@@ -330,6 +484,7 @@ Pattern var_simplify(Pattern&s) {
   }
   return r;
 }
+
 
 void init(vector<Text>& _docs, bool DEBUG) {
   docs = _docs;
@@ -355,7 +510,8 @@ void init(vector<Text>& _docs, bool DEBUG) {
 
 }
 
-vector<Pattern> kmmg(int K)
+
+vector<Pattern> kmmg(Mode mode, int K, double rho)
 {
   const int n = docs.size();
 
@@ -367,77 +523,78 @@ vector<Pattern> kmmg(int K)
   // いくつのパターンに被覆されているか
   vi cover_count(n, 1);
 
-  // (num_of_fixed, Pattern, cover)
+  // (priority, Pattern, cover)
   priority_queue<pair<Integer, pair<Pattern, vi>>> pcs;
-  if (RANDOM_PRIORITY) {
-    pcs.push({ rand()%20, { pc, ids }});
-  } else {
-    int ell = upper_length(ids);
-    pcs.push({ language_size(pc, ell), { pc, ids }});
-  }
+  pcs.push({ 1, { pc, ids }});
   vector<Pattern> ret;
 
   /* division */
   while (not pcs.empty())
   {
     auto tpl = pcs.top(); pcs.pop();
-    auto& p = tpl.second.first;
-    auto& c = tpl.second.second;
-    cerr << "# div: " << tpl.first << ": " << p << endl;
+    Pattern& p = tpl.second.first;
+    vi& c = tpl.second.second;
 
-    // S = Doc - L(Pi - p)
-    vi S;
-    for (int i: c) {
-      if (cover_count[i] == 1) S.push_back(i);
-      --cover_count[i];
-    }
-    if (S.size() == 0) continue;
-
-    vector<pair<Pattern, vi>> pcs_next = division(p, S);
+    vector<pair<Pattern, vi>> dPC = division(p, c);
 
     // when not divisible
-    if (pcs_next.size() < 2) {
+    if (dPC.size() < 2) {
       if (DEBUG) { cerr << "a pattern " << p << " is not divisible" << endl; }
       ret.push_back(p);
       continue;
     }
 
-    // when |P| > K
-    if (ret.size() + pcs.size() + pcs_next.size() > K) {
-      if (DEBUG) {
-        cerr << "#pattern is over K=" << K << endl;
-        trace(ret.size()); trace(pcs.size()); trace(pcs_next.size());
+    if (mode == KMULTIPLE) {
+      // when |P| > K
+      if (ret.size() + pcs.size() + dPC.size() > K) {
+        if (DEBUG) {
+          cerr << "#pattern is over K=" << K << endl;
+          trace(ret.size()); trace(pcs.size()); trace(dPC.size());
+        }
+        ret.push_back(p);
+        while (not pcs.empty()) {
+          ret.push_back(pcs.top().second.first);
+          pcs.pop();
+        }
+        return ret;
       }
+    }
+
+    if (all_output) {
       ret.push_back(p);
-      while (not pcs.empty()) {
-        ret.push_back(pcs.top().second.first);
-        pcs.pop();
-      }
-      return ret;
     }
 
-    for (auto&pc_next: pcs_next) {
-      // Doc - (Pi - pc_next)
-      vi S;
-      for (int i: pc_next.second) {
-        if (cover_count[i] == 0) S.push_back(i);
+    if (mode == ABSTRACTION) {
+      bool ok = true;
+      for (auto& qc: dPC) if (abstract(qc.first) < rho) { ok = false; break; }
+      if (not ok) {
+        for (auto& qc: dPC) {
+          ret.push_back(qc.first);
+        }
+        continue;
       }
-      auto p_next = tighten(pc_next.first, S);
+    }
+
+    for (auto& qc: dPC) {
+      Pattern& q = qc.first;
       if (RANDOM_PRIORITY) {
-        pcs.push({ rand()%20, { p_next, S }});
+        pcs.push({ rand()%20, { q, qc.second }});
       } else {
-        int ell = upper_length(S);
-        pcs.push({ language_size(p_next, ell), { p_next, S }});
+        int ell = upper_length(qc.second);
+        Integer pr = log(language_size(q, ell));
+        pcs.push({ pr, { q, qc.second }});
       }
     }
 
-    for (auto&pc_next: pcs_next) {
-      for (int i: pc_next.second) ++cover_count[i];
+    // update counter
+    for (auto& qc: dPC) {
+      for (int i: qc.second) ++cover_count[i];
     }
 
   }
   return ret;
 }
+
 
 /*
  * construct a NFA
@@ -469,6 +626,7 @@ NFA(const Pattern& p, int ell, bool DEBUG)
   }
   return nfa;
 }
+
 
 /*
  * construct DFA (via NFA)
@@ -574,6 +732,7 @@ DFA(const Pattern& p, int ell, bool DEBUG)
   }
   return make_pair(dfa, n);
 }
+
 
 inline
 Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
@@ -683,21 +842,42 @@ Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
   return sum;
 }
 
+
 /*
  * |L^{<= ell}(p)|
  */
-Integer language_size(const Pattern& p, int ell, bool DEBUG)
+Integer language_size(const Pattern& p, int ell, bool DEBUG) // about
+{
+  Integer ret = 1;
+  for (auto&u: p) {
+    if (u.t == WORD) --ell;
+    else if (u.t == POS) {
+      --ell;
+      ret *= class_size[u.pos];
+    }
+  }
+  while (ell > 0) {
+    --ell;
+    ret *= alphabet_size;
+  }
+  return ret;
+}
+
+/*
+Integer language_size(const Pattern& p, int ell, bool DEBUG) // exact
 {
   const int n = p.size();
   if (ell < n) return 0;
   Integer ac = 1;
   int i = 0,
       j = n - 1;
+  // remove head (a, <A>)
   for (; i <= j; ++i) {
     if (p[i].t == VAR) break;
     if (p[i].t == POS) { ac *= class_size[p[i].pos]; }
     --ell;
   }
+  // remove tail (a, <A>)
   for (; i <= j; --j) {
     if (p[j].t == VAR) break;
     if (p[j].t == POS) { ac *= class_size[p[j].pos]; }
@@ -708,4 +888,5 @@ Integer language_size(const Pattern& p, int ell, bool DEBUG)
   if (r.size() == 0) return ac;
   return ac * language_size_sub(r, ell, DEBUG);
 }
+*/
 

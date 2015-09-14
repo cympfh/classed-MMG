@@ -1,3 +1,6 @@
+match: match.exe
+	./match.exe
+
 all: lang_size
 	make clean
 

@@ -40,11 +40,28 @@ int main(int argc, char*argv[])
       }
       if (s == "-K") {
         K = str_to_int(string(argv[i+1]));
-        if (DEBUG) trace(K);
+        mode = KMULTIPLE;
+      }
+      if (s == "-r") {
+        stringstream sin(argv[i+1]);
+        sin >> rho;
+        mode = ABSTRACTION;
+      }
+      if (s == "-A") {
+        all_output = true;
       }
       if (s == "-R") {
         RANDOM_PRIORITY = true;
       }
+    }
+  }
+
+  if (DEBUG) {
+    if (mode == KMULTIPLE) {
+      cerr << "mode: k-multiple; k=" << K << endl;
+    }
+    else {
+      cerr << "mode: abstraction; rho=" << rho << endl;
     }
   }
 
@@ -62,10 +79,10 @@ int main(int argc, char*argv[])
   }
 
   // dassee
-  init(docs);
+  init(docs, DEBUG);
 
   // 行くぜ
-  auto result = kmmg(K);
+  auto result = kmmg(mode, K, rho);
   for (auto& p: result) {
     cout << p << endl;
   }
