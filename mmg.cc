@@ -596,6 +596,28 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
 }
 
 
+
+/*
+ * |L^{<= ell}(p)|
+ */
+Integer language_size(const Pattern& p, int ell, bool DEBUG) // about
+{
+  Integer ret = 1;
+  for (auto&u: p) {
+    if (u.t == WORD) --ell;
+    else if (u.t == POS) {
+      --ell;
+      ret *= class_size[u.pos];
+    }
+  }
+  while (ell > 0) {
+    --ell;
+    ret *= alphabet_size;
+  }
+  return ret;
+}
+
+
 /*
  * construct a NFA
  * s.t.  L(NFA) = L(p)
@@ -604,6 +626,8 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
  * using state = int;
  * nfa[state] = map<PUnit, vector<state>>
  */
+
+/*
 inline
 vector<map<PUnit, vi>>
 NFA(const Pattern& p, int ell, bool DEBUG)
@@ -626,12 +650,13 @@ NFA(const Pattern& p, int ell, bool DEBUG)
   }
   return nfa;
 }
-
+*/
 
 /*
  * construct DFA (via NFA)
  * s.t. L(DFA) = L(p)
  */
+/*
 inline
 pair<
   map<State, map<PUnit, State>>,
@@ -732,8 +757,9 @@ DFA(const Pattern& p, int ell, bool DEBUG)
   }
   return make_pair(dfa, n);
 }
+*/
 
-
+/*
 inline
 Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
 {
@@ -841,27 +867,7 @@ Integer language_size_sub(const Pattern& p, int ell, bool DEBUG)
   }
   return sum;
 }
-
-
-/*
- * |L^{<= ell}(p)|
- */
-Integer language_size(const Pattern& p, int ell, bool DEBUG) // about
-{
-  Integer ret = 1;
-  for (auto&u: p) {
-    if (u.t == WORD) --ell;
-    else if (u.t == POS) {
-      --ell;
-      ret *= class_size[u.pos];
-    }
-  }
-  while (ell > 0) {
-    --ell;
-    ret *= alphabet_size;
-  }
-  return ret;
-}
+*/
 
 /*
 Integer language_size(const Pattern& p, int ell, bool DEBUG) // exact
