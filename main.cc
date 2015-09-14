@@ -73,7 +73,6 @@ int main(int argc, char*argv[])
       getline(cin, ln);
       if (not cin) break;
       Text text = to_sentence(ln);
-      if (DEBUG) trace(text);
       docs.push_back(text);
     }
   }

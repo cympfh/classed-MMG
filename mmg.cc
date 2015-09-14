@@ -1,6 +1,8 @@
+#include <bits/stdc++.h>
+#include <gmpxx.h>
+using namespace std;
 #include "util.cc"
 #include "mmg.hh"
-using namespace std;
 
 enum PUnitType {
   VAR, POS, WORD
@@ -213,30 +215,17 @@ bool language_include(vi&c, Pattern&p) {
 }
 
 // S cap L(p); S = { docs[i] : i <- c }
-vi cover(Pattern&p, vi&c) {
+vi cover(Pattern&p, const vi&c) {
   vi r;
   for (int i: c)
     if (preceq(docs[i], p)) r.push_back(i);
   return r;
 }
 
-set<int> coverset(Pattern&p, vi&c) {
+set<int> coverset(Pattern&p, const vi&c) {
   set<int> s;
   for (int i: c)
     if (preceq(docs[i], p)) s.insert(i);
-  return s;
-}
-
-
-// { a : a <- docs[i], i <- c }
-// gather all alphabets using in `c`
-set<Alphabet> alphabets(vi&c) {
-  set<Alphabet> s;
-  for (int idx: c) {
-    for (Alphabet&a: docs[idx]) {
-      s.insert(a);
-    }
-  }
   return s;
 }
 
@@ -248,29 +237,26 @@ int upper_length(const vi& c) {
   return r;
 }
 
-vector<string> priority_pos = {
-  "VB", "VBD", "VBG", "VBN", "VBP", "VBZ",
-  "NN",
-  "IN"
-};
-
-set<string> stoppos = {
-  "DT",
-  "JJ", "JJR", "JJS"
-};
+bool is_text(const Pattern& p) {
+  rep (i, p.size()) if (p[i].t != WORD) return false;
+  return true;
+}
 
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
 Pattern tighten(Pattern p, vi&c)
 {
+
+  if (is_text(p)) return p;
   const int n = p.size();
   assert(c.size() > 0);
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
-    set<Alphabet> s = alphabets(c);
-    for (auto&a: s) {
-      dict[a.pos].push_back(a.word);
+    for (int i: c) {
+      for (const Alphabet& a: docs[i]) {
+        dict[a.pos].push_back(a.word);
+      }
     }
   }
 
@@ -280,13 +266,11 @@ Pattern tighten(Pattern p, vi&c)
     if (p[i].t == VAR) {
       p[i].t = POS;
       for (string& pos: priority_pos) {
-        if (not dict.count(pos)) continue;
         p[i].pos = pos;
         if (language_include(c, p)) return tighten(p, c);
       }
-      for (auto&pr: dict) {
-        if (pr.first == "CD") continue;
-        p[i].pos = pr.first;
+      for (string& pos: inpriority_pos) {
+        p[i].pos = pos;
         if (language_include(c, p)) return tighten(p, c);
       }
       p[i].t = VAR;
@@ -336,25 +320,25 @@ Pattern tighten(Pattern p, set<int> c) {
 inline
 Integer priority(const Pattern& p, int ell, const set<int>& cover) {
   Integer r = cover.size();
-  Integer c = language_size(p, ell);
+  // Integer c = language_size(p, ell);
   // cerr << "priority=" << (make_tuple(p, (r), make_pair(c, ell)))<<endl;
   return r;
 }
 
-
-vector<pair<Pattern, vi>> division(Pattern p, vi&c)
+vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
 {
   const int
     n = p.size(),
     M = c.size();
 
-  if (DEBUG) { cerr << "# division of " << p << ", " << c << endl; }
+  if (DEBUG) { cerr << endl; cerr << "# division of " << p << ", " << c << endl; }
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
-    set<Alphabet> s = alphabets(c);
-    for (auto&a: s) {
-      dict[a.pos].push_back(a.word);
+    for (int i: c) {
+      for (const Alphabet& a: docs[i]) {
+        dict[a.pos].push_back(a.word);
+      }
     }
   }
 
@@ -369,9 +353,9 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
         p[i].word = w;
         auto s = coverset(p, c);
         if (s.size() > 0) {
-          Pattern r = tighten(p, s);
-          Integer pr = priority(r, ell, s);
-          cspc.push_back({ pr, { r, s }});
+          // Pattern r = tighten(p, s);
+          // Integer pr = priority(r, ell, s);
+          cspc.push_back({ s.size(), { p, s }});
         }
       }
       p[i].t = WORD;
@@ -384,9 +368,9 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
         p[i].pos = pr.first;
         auto s = coverset(p, c);
         if (s.size() > 0) {
-          Pattern r = tighten(p, s);
-          Integer pr = priority(r, ell, s);
-          cspc.push_back({ pr, { r, s }});
+          // Pattern r = tighten(p, s);
+          // Integer pr = priority(r, ell, s);
+          cspc.push_back({ s.size(), { p, s }});
         }
       }
       p[i].t = VAR;
@@ -404,20 +388,20 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
       // cspc.push_back({ q, coverset(q, c) });
       auto s = coverset(q, c);
       if (s.size() > 0) {
-        Pattern r = tighten(p, s);
-        Integer pr = priority(r, ell, s);
-        cspc.push_back({ pr, { r, s }});
+        // Pattern r = tighten(p, s);
+        // Integer pr = priority(r, ell, s);
+        cspc.push_back({ s.size(), { p, s }});
       }
     }
   }
 
-  if (DEBUG) {
-    cerr << "--- cspc" << endl;
-    for (auto& a: cspc) {
-      cerr << a << endl;
-    }
-    cerr << "---" << endl;
+  if (DEBUG) cerr << "{{{ cspc" << endl;
+  for (auto& a: cspc) {
+    if (DEBUG) cerr << a.second.first << " -> ";
+    a.second.first = tighten(a.second.first, a.second.second);
+    if (DEBUG) cerr << a.second.first << " (" << a.second.second << ')' << endl;
   }
+  if (DEBUG) cerr << "}}}" << endl;
 
   vector<pair<Pattern, vi>> div;
 
@@ -457,8 +441,9 @@ vector<pair<Pattern, vi>> division(Pattern p, vi&c)
   }
 
   if (DEBUG) {
-    cerr << "following " << div.size() << " patterns" << endl;
+    cerr << "{{{ div: " << div.size() << " patterns" << endl;
     for (auto& p: div) cerr << " -- " << p.first << " where " << p.second << endl;
+    cerr << "}}}" << endl;
   }
 
   return div;
@@ -503,11 +488,30 @@ void init(vector<Text>& _docs, bool DEBUG) {
     class_size[a.pos]++;
   }
 
-  if (DEBUG) {
-    trace(alphabet_size);
-    for (auto&pr: class_size) trace(pr);
+  vector<string> __priority_pos;
+  for (auto pos: priority_pos) {
+    bool ok = false;
+    for (const auto&pr: class_size) {
+      if (pos == pr.first) { ok = true; break; }
+    }
+    if (ok) __priority_pos.push_back(pos);
+  }
+  priority_pos = __priority_pos;
+
+  for (const auto&pr: class_size) {
+    bool ok = true;
+    for (auto pos: priority_pos) {
+      if (pos == pr.first) { ok = false; break; }
+    }
+    if (ok) {
+      inpriority_pos.push_back(pr.first);
+    }
   }
 
+  if (DEBUG) {
+    trace(priority_pos);
+    trace(inpriority_pos);
+  }
 }
 
 
@@ -580,8 +584,7 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
       if (RANDOM_PRIORITY) {
         pcs.push({ rand()%20, { q, qc.second }});
       } else {
-        int ell = upper_length(qc.second);
-        Integer pr = log(language_size(q, ell));
+        Integer pr = log(language_size(q));
         pcs.push({ pr, { q, qc.second }});
       }
     }
@@ -598,21 +601,16 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
 
 
 /*
- * |L^{<= ell}(p)|
+ * |L^{<= length(p)}(p)|
  */
-Integer language_size(const Pattern& p, int ell, bool DEBUG) // about
-{
+Integer language_size(const Pattern& p) {
   Integer ret = 1;
   for (auto&u: p) {
-    if (u.t == WORD) --ell;
-    else if (u.t == POS) {
-      --ell;
+    if (u.t == VAR) {
+      ret *= alphabet_size;
+    } else if (u.t == POS) {
       ret *= class_size[u.pos];
     }
-  }
-  while (ell > 0) {
-    --ell;
-    ret *= alphabet_size;
   }
   return ret;
 }

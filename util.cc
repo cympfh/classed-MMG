@@ -1,7 +1,7 @@
-#include "./global.cc"
 #include <bits/stdc++.h>
 #include <gmpxx.h>
 using namespace std;
+#include "./global.cc"
 
 #define rep(i,n) for(int i=0;i<(n);++i)
 #define loop for(;;)
