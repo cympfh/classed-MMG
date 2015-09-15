@@ -3,6 +3,7 @@
 using namespace std;
 #include "util.cc"
 #include "mmg.hh"
+#include "./setcover.hh"
 
 enum PUnitType {
   VAR, POS, WORD
@@ -208,7 +209,7 @@ bool DP_preceq(const Text& s, const Pattern& p) {
 }
 
 // S subseteq L(p); S = { docs[i] : i <- c }
-bool language_include(vi&c, Pattern&p) {
+bool language_include(const vi&c, Pattern&p) {
   for (int i: c)
     if (not preceq(docs[i], p)) return false;
   return true;
@@ -244,7 +245,7 @@ bool is_text(const Pattern& p) {
 
 // find a minimal pattern from `p` respect to `c`
 // precondition: S(c) subseteq L(p)
-Pattern tighten(Pattern p, vi&c)
+Pattern tighten(Pattern p, const vi&c)
 {
 
   if (is_text(p)) return p;
@@ -294,7 +295,7 @@ Pattern tighten(Pattern p, vi&c)
   // <> -> <> <>
   rep (i, n) {
     q[i] = p[i];
-    if (p[i].t == VAR) {
+    if (p[i].t == VAR && (i == 0 or p[i-1].t != VAR)) {
       q[i+1] = PUnit();
       for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
       if (language_include(c, q)) return tighten(q, c);
@@ -305,33 +306,26 @@ Pattern tighten(Pattern p, vi&c)
 }
 
 
-Pattern tighten(Pattern p, set<int> c) {
+Pattern tighten(Pattern p, const set<int>& c) {
   vi v;
   for (int i: c) v.push_back(i);
   return tighten(p, v);
 }
 
-
-/*
- * 最小被覆を貪欲にするための優先度
- * 被覆サイズが大きいパターンに大きな値を与える
- * でも #L が大きい物には少し小さくさせたい
- */
-inline
-Integer priority(const Pattern& p, int ell, const set<int>& cover) {
-  Integer r = cover.size();
-  // Integer c = language_size(p, ell);
-  // cerr << "priority=" << (make_tuple(p, (r), make_pair(c, ell)))<<endl;
-  return r;
-}
-
 vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
 {
+  vector<pair<Pattern, vi>> div;
+  if (is_text(p)) { return div; } // not-divisible in trivial
+
   const int
     n = p.size(),
     M = c.size();
 
   if (DEBUG) { cerr << endl; cerr << "# division of " << p << ", " << c << endl; }
+  /*
+  p = tighten(p, c);
+  if (DEBUG) { cerr << "  tighten: " << p << endl; }
+  */
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
@@ -342,8 +336,8 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
     }
   }
 
-  vector<pair<Integer, pair<Pattern, set<int>>>> cspc; 
-  int ell = upper_length(c);
+  vector<pair<Pattern, set<int>>> cspc;
+
   rep (i, n) {
     // <A> -> a/A
     if (p[i].t == POS) {
@@ -353,9 +347,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
         p[i].word = w;
         auto s = coverset(p, c);
         if (s.size() > 0) {
-          // Pattern r = tighten(p, s);
-          // Integer pr = priority(r, ell, s);
-          cspc.push_back({ s.size(), { p, s }});
+          cspc.push_back({ p, s });
         }
       }
       p[i].t = WORD;
@@ -368,9 +360,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
         p[i].pos = pr.first;
         auto s = coverset(p, c);
         if (s.size() > 0) {
-          // Pattern r = tighten(p, s);
-          // Integer pr = priority(r, ell, s);
-          cspc.push_back({ s.size(), { p, s }});
+          cspc.push_back({ p, s });
         }
       }
       p[i].t = VAR;
@@ -382,67 +372,49 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
   // <> -> <> <>
   rep (i, n) {
     q[i] = p[i];
-    if (p[i].t == VAR) {
+    if (p[i].t == VAR && (i == 0 or p[i-1].t != VAR)) {
       q[i+1] = PUnit();
       for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
-      // cspc.push_back({ q, coverset(q, c) });
       auto s = coverset(q, c);
       if (s.size() > 0) {
-        // Pattern r = tighten(p, s);
-        // Integer pr = priority(r, ell, s);
-        cspc.push_back({ s.size(), { p, s }});
+        cspc.push_back({ p, s });
       }
     }
   }
 
-  if (DEBUG) cerr << "{{{ cspc" << endl;
-  for (auto& a: cspc) {
-    if (DEBUG) cerr << a.second.first << " -> ";
-    a.second.first = tighten(a.second.first, a.second.second);
-    if (DEBUG) cerr << a.second.first << " (" << a.second.second << ')' << endl;
-  }
-  if (DEBUG) cerr << "}}}" << endl;
-
-  vector<pair<Pattern, vi>> div;
-
-  if (cspc.size() == 0) {
-    if (DEBUG) { cerr << "cspc.size() == 0" << endl; }
-    return div;
+  if (DEBUG) {
+    cerr << "{{{ cspc: " << cspc.size() << " patterns" << endl;
+    for (auto& a: cspc) {
+      cerr << a.first << " (" << a.second << ')' << endl;
+    }
+    cerr << "}}}" << endl;
   }
 
-  const
-  auto sort_by_setsize = [](
-      const pair<Integer, pair<Pattern, set<int>>>& x,
-      const pair<Integer, pair<Pattern, set<int>>>& y) {
-    return x.first > y.first;
-  };
+  if (cspc.size() == 0) return div;
 
-  { // 貪欲に近似の最小集合被覆
-    int i = 0;
-    set<int> m;
-    while (m.size() < M) {
-      sort(cspc.begin() + i, cspc.end(), sort_by_setsize);
-      if (cspc[i].second.second.size() > 0) {
-        vi v;
-        for (int id: cspc[i].second.second) {
-          v.push_back(id);
-          if (m.count(id) == 0) {
-            m.insert(id);
-            for (int j = i + 1; j < cspc.size(); ++j) cspc[j].second.second.erase(id);
-          }
-        }
-        Pattern& p = cspc[i].second.first;
-        // cerr << "tighten of " << p << " where " << v << endl;
-        p = tighten(p, v); // ここでついでに tightest にしておこう
-        div.push_back({ p, v });
-      }
-      ++i;
+  // 重み付き集合被覆問題を解いてもらう
+  // まだパターンは tighten しないこと
+  {
+    vector<pair<set<int>, Integer>> ls(cspc.size());
+    rep (i, cspc.size()) {
+      Integer w = language_size(cspc[i].first);
+      ls[i] = { cspc[i].second, w };
+    }
+    set<int> sol;
+    if (UNWEIGHTED_COVERING)
+      sol = unweighted_setcover(ls);
+    else
+      sol = setcover(ls);
+    for (auto id: sol) {
+      div.push_back({ cspc[id].first, set_to_vi(cspc[id].second) });
     }
   }
 
   if (DEBUG) {
     cerr << "{{{ div: " << div.size() << " patterns" << endl;
-    for (auto& p: div) cerr << " -- " << p.first << " where " << p.second << endl;
+    for (auto& p: div) {
+      cerr << p.first << " (" << p.second << ')' << endl;
+    }
     cerr << "}}}" << endl;
   }
 
@@ -535,15 +507,23 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
   /* division */
   while (not pcs.empty())
   {
-    auto tpl = pcs.top(); pcs.pop();
-    Pattern& p = tpl.second.first;
-    vi& c = tpl.second.second;
+    auto pc   = pcs.top(); pcs.pop();
+    Pattern p = pc.second.first;
+    vi& c     = pc.second.second;
 
-    vector<pair<Pattern, vi>> dPC = division(p, c);
+    vi s; // = S - L(P - p)
+    for (int i: c) {
+      if (cover_count[i] == 1) s.push_back(i);
+      --cover_count[i];
+    }
+    if (s.size() == 0) continue;
+
+    p = tighten(p, s);
+    vector<pair<Pattern, vi>> dPC = division(p, s);
 
     // when not divisible
     if (dPC.size() < 2) {
-      if (DEBUG) { cerr << "a pattern " << p << " is not divisible" << endl; }
+      if (DEBUG) { cerr << "# not divisible: " << p << endl; }
       ret.push_back(p);
       continue;
     }
@@ -556,11 +536,14 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
           trace(ret.size()); trace(pcs.size()); trace(dPC.size());
         }
         ret.push_back(p);
+        /*
         while (not pcs.empty()) {
           ret.push_back(pcs.top().second.first);
           pcs.pop();
         }
         return ret;
+        */
+        continue;
       }
     }
 
@@ -579,22 +562,23 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
       }
     }
 
-    for (auto& qc: dPC) {
-      Pattern& q = qc.first;
-      if (RANDOM_PRIORITY) {
-        pcs.push({ rand()%20, { q, qc.second }});
-      } else {
-        Integer pr = log(language_size(q));
+    { // push to queue
+      for (auto& qc: dPC) {
+        Pattern& q = qc.first;
+        Integer pr = log(10, language_size(q));
         pcs.push({ pr, { q, qc.second }});
+        for (int i: qc.second) ++cover_count[i];
       }
     }
 
-    // update counter
-    for (auto& qc: dPC) {
-      for (int i: qc.second) ++cover_count[i];
-    }
-
   }
+
+  if (DEBUG) {
+    cerr << "{{{ MMG Result: " << ret.size() << " patterns" << endl;
+    for (auto&p: ret) cerr << p << endl;
+    cerr << "}}}" << endl;
+  }
+
   return ret;
 }
 

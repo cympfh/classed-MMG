@@ -81,10 +81,10 @@ string d2b(T s, int n) {
   return sout.str();
 }
 
-Integer log(Integer x) {
-  if (x <= 1) return 0;
-  Integer r = 1;
-  while (r < x) r *= 2;
+inline
+vector<int> set_to_vi(const set<int>& s) {
+  vector<int> r;
+  for (int x: s) r.push_back(x);
   return r;
 }
 

@@ -9,6 +9,11 @@ pair<string, string> split_word_pos(string&s)
   for (i = n - 2; i >= 0; --i) {
     if (s[i] == '_') break;
   }
+  if (i <= 0) {
+    for (i = n - 2; i >= 0; --i) {
+      if (s[i] == '/') break;
+    }
+  }
   assert(i > 0);
   w = s.substr(0, i);
   p = s.substr(i + 1);
@@ -50,8 +55,17 @@ int main(int argc, char*argv[])
       if (s == "-A") {
         all_output = true;
       }
-      if (s == "-R") {
-        RANDOM_PRIORITY = true;
+      if (s == "-U") {
+        UNWEIGHTED_COVERING = true;
+      }
+      if (s == "-h") {
+        cerr << "Usage: mmg [options] < text_file" << endl;
+        cerr << "  -D             debug mode" << endl;
+        cerr << "  -K <int>       set k-mutliple" << endl;
+        cerr << "  -r <double>    unset k-mutliple and set rho" << endl;
+        cerr << "  -A             set all output mode" << endl;
+        cerr << "  -R             select randomly in division" << endl;
+        return 0;
       }
     }
   }

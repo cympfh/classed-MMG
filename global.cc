@@ -7,7 +7,7 @@ double rho = 0.3;
 enum Mode { KMULTIPLE, ABSTRACTION };
 Mode mode = KMULTIPLE;
 bool all_output= false;
-bool RANDOM_PRIORITY = false;
+bool UNWEIGHTED_COVERING = false;
 
 vector<string> priority_pos = {
   "VB", "VBD", "VBG", "VBN", "VBP", "VBZ",
@@ -18,8 +18,8 @@ vector<string> priority_pos = {
 vector<string> inpriority_pos;
 
 set<string> stoppos = {
-  "CD",
-  "DT",
-  "JJ", "JJR", "JJS"
+//  "CD",
+//  "DT",
+//  "JJ", "JJR", "JJS"
 };
 
