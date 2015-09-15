@@ -346,6 +346,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
       for (string&w: dict[pos]) {
         p[i].word = w;
         auto s = coverset(p, c);
+        assert(s.size() < c.size() && "<A> -> a/A");
         if (s.size() > 0) {
           cspc.push_back({ p, s });
         }
@@ -359,6 +360,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
       for (auto&pr: dict) {
         p[i].pos = pr.first;
         auto s = coverset(p, c);
+        assert(s.size() < c.size() && "<> -> <A>");
         if (s.size() > 0) {
           cspc.push_back({ p, s });
         }
@@ -376,6 +378,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
       q[i+1] = PUnit();
       for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
       auto s = coverset(q, c);
+      assert(s.size() < c.size() && "<> -> <> <>");
       if (s.size() > 0) {
         cspc.push_back({ p, s });
       }
@@ -558,7 +561,7 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
     { // push to queue
       for (auto& qc: dPC) {
         Pattern& q = qc.first;
-        Integer pr = log(10, language_size(q));
+        Integer pr = qc.second.size();
         pcs.push({ pr, { q, qc.second }});
         for (int i: qc.second) ++cover_count[i];
       }
