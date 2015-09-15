@@ -536,13 +536,6 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
           trace(ret.size()); trace(pcs.size()); trace(dPC.size());
         }
         ret.push_back(p);
-        /*
-        while (not pcs.empty()) {
-          ret.push_back(pcs.top().second.first);
-          pcs.pop();
-        }
-        return ret;
-        */
         continue;
       }
     }
