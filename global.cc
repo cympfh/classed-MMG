@@ -3,11 +3,10 @@ using namespace std;
 
 bool DEBUG = false;
 int K = 1;
-double rho = 0.3;
-enum Mode { KMULTIPLE, ABSTRACTION };
-Mode mode = KMULTIPLE;
-bool all_output= false;
-bool UNWEIGHTED_COVERING = false;
+double limit = 1.0;
+
+enum Mode { K_MULTIPLE, GAIN_LIMIT };
+Mode mode = K_MULTIPLE;
 
 vector<string> priority_pos = {
   "VB", "VBD", "VBG", "VBN", "VBP", "VBZ",

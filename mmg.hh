@@ -13,7 +13,7 @@ set<Alphabet> vocabulary;
 
 bool preceq(const Text&, const Pattern&, bool=false);
 void init(vector<Text>&_docs, bool=false);
-vector<Pattern> kmmg(int K);
+vector<Pattern> kmmg();
 
 using State = long long unsigned int;
 

@@ -312,20 +312,11 @@ Pattern tighten(Pattern p, const set<int>& c) {
   return tighten(p, v);
 }
 
-vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
+vector<pair<Pattern, set<int>>> cspc(Pattern p, const vi&c)
 {
-  vector<pair<Pattern, vi>> div;
-  if (is_text(p)) { return div; } // not-divisible in trivial
-
   const int
     n = p.size(),
     M = c.size();
-
-  if (DEBUG) { cerr << endl; cerr << "# division of " << p << ", " << c << endl; }
-  /*
-  p = tighten(p, c);
-  if (DEBUG) { cerr << "  tighten: " << p << endl; }
-  */
 
   map<string, vector<string>> dict; // dict[pos] = { word }
   {
@@ -336,7 +327,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
     }
   }
 
-  vector<pair<Pattern, set<int>>> cspc;
+  vector<pair<Pattern, set<int>>> ret;
 
   rep (i, n) {
     // <A> -> a/A
@@ -348,7 +339,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
         auto s = coverset(p, c);
         assert(s.size() < c.size() && "<A> -> a/A");
         if (s.size() > 0) {
-          cspc.push_back({ p, s });
+          ret.push_back({ p, s });
         }
       }
       p[i].t = WORD;
@@ -362,7 +353,7 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
         auto s = coverset(p, c);
         assert(s.size() < c.size() && "<> -> <A>");
         if (s.size() > 0) {
-          cspc.push_back({ p, s });
+          ret.push_back({ p, s });
         }
       }
       p[i].t = VAR;
@@ -380,45 +371,40 @@ vector<pair<Pattern, vi>> division(Pattern p, const vi&c)
       auto s = coverset(q, c);
       assert(s.size() < c.size() && "<> -> <> <>");
       if (s.size() > 0) {
-        cspc.push_back({ p, s });
+        ret.push_back({ p, s });
       }
     }
   }
 
-  if (DEBUG) {
-    cerr << "{{{ cspc: " << cspc.size() << " patterns" << endl;
-    for (auto& a: cspc) {
-      cerr << a.first << " (" << a.second << ')' << endl;
-    }
-    cerr << "}}}" << endl;
+  // tighten all
+  rep (i, ret.size()) {
+    ret[i].first = tighten(ret[i].first, ret[i].second);
   }
 
-  if (cspc.size() == 0) return div;
+  return ret;
+}
 
-  // 重み付き集合被覆問題を解いてもらう
-  // まだパターンは tighten しないこと
-  {
-    vector<pair<set<int>, Integer>> ls(cspc.size());
-    rep (i, cspc.size()) {
-      Integer w = language_size(cspc[i].first);
-      ls[i] = { cspc[i].second, w };
-    }
-    set<int> sol;
-    if (UNWEIGHTED_COVERING)
-      sol = unweighted_setcover(ls);
-    else
-      sol = setcover(ls);
-    for (auto id: sol) {
-      div.push_back({ cspc[id].first, set_to_vi(cspc[id].second) });
-    }
+vector<pair<Pattern, vi>> division(vector<pair<Pattern, set<int>>>&ps, const vi&c, bool weighted=true)
+{
+  vector<pair<Pattern, vi>> div;
+  if (ps.size() == 0) return div;
+
+  // solve set cover problem
+  vector<pair<set<int>, Integer>> ls(ps.size());
+  rep (i, ps.size()) {
+    Integer w = language_size(ps[i].first);
+    ls[i] = { ps[i].second, w };
   }
 
-  if (DEBUG) {
-    cerr << "{{{ div: " << div.size() << " patterns" << endl;
-    for (auto& p: div) {
-      cerr << p.first << " (" << p.second << ')' << endl;
-    }
-    cerr << "}}}" << endl;
+  set<int> sol;
+  if (weighted) {
+    sol = setcover(ls);
+  } else {
+    sol = unweighted_setcover(ls);
+  }
+
+  for (auto id: sol) {
+    div.push_back({ ps[id].first, set_to_vi(ps[id].second) });
   }
 
   return div;
@@ -490,7 +476,7 @@ void init(vector<Text>& _docs, bool DEBUG) {
 }
 
 
-vector<Pattern> kmmg(Mode mode, int K, double rho)
+vector<Pattern> kmmg()
 {
   const int n = docs.size();
 
@@ -522,44 +508,55 @@ vector<Pattern> kmmg(Mode mode, int K, double rho)
     if (s.size() == 0) continue;
 
     p = tighten(p, s);
-    vector<pair<Pattern, vi>> dPC = division(p, s);
+
+    if (is_text(p)) { // not divisible clearly
+      if (DEBUG) { cerr << "# not divisible clearly: " << p << endl; }
+      ret.push_back(p);
+      continue;
+    }
+
+    auto ps = cspc(p, s);
+    if (DEBUG) {
+      cerr << "cspc:" << ret.size() << endl;
+      cerr << "{{{" << endl;
+      for (auto& a: ps) cerr << a.first << " (" << a.second << ')' << endl;
+      cerr << "}}}" << endl;
+    }
+    auto qs = division(ps, s, true); // weighted
+    if (DEBUG) {
+      cerr << "weighted:" << qs.size() << endl;
+      cerr << "{{{" << endl;
+      for (auto& p: qs) cerr << p.first << " (" << p.second << ')' << endl;
+      cerr << "}}}" << endl;
+    }
+    if ((mode == K_MULTIPLE) and (ret.size() + pcs.size() + qs.size() > K)) {
+      qs = division(ps, s, false);
+      if (DEBUG) {
+        cerr << "unweighted:" << qs.size() << endl;
+        cerr << "{{{" << endl;
+        for (auto& p: qs) cerr << p.first << " (" << p.second << ')' << endl;
+        cerr << "}}}" << endl;
+      }
+    }
 
     // when not divisible
-    if (dPC.size() < 2) {
+    if (qs.size() < 2) {
       if (DEBUG) { cerr << "# not divisible: " << p << endl; }
       ret.push_back(p);
       continue;
     }
 
-    if (mode == KMULTIPLE) {
-      // when |P| > K
-      if (ret.size() + pcs.size() + dPC.size() > K) {
-        if (DEBUG) {
-          cerr << "#pattern is over K=" << K << endl;
-          trace(ret.size()); trace(pcs.size()); trace(dPC.size());
-        }
-        ret.push_back(p);
-        continue;
+    if ((mode == K_MULTIPLE) and (ret.size() + pcs.size() + qs.size() > K)) {
+      if (DEBUG) {
+        cerr << "#pattern is over K=" << K << endl;
+        trace(ret.size()); trace(pcs.size()); trace(qs.size());
       }
-    }
-
-    if (all_output) {
       ret.push_back(p);
-    }
-
-    if (mode == ABSTRACTION) {
-      bool ok = true;
-      for (auto& qc: dPC) if (abstract(qc.first) < rho) { ok = false; break; }
-      if (not ok) {
-        for (auto& qc: dPC) {
-          ret.push_back(qc.first);
-        }
-        continue;
-      }
+      continue;
     }
 
     { // push to queue
-      for (auto& qc: dPC) {
+      for (auto& qc: qs) {
         Pattern& q = qc.first;
         Integer pr = qc.second.size();
         pcs.push({ pr, { q, qc.second }});

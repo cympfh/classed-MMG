@@ -14,7 +14,7 @@ pair<string, string> split_word_pos(string&s)
       if (s[i] == '/') break;
     }
   }
-  assert(i > 0);
+  if (i <= 0) { return make_pair(s, s); }
   w = s.substr(0, i);
   p = s.substr(i + 1);
   return make_pair(w, p);
@@ -33,6 +33,14 @@ Text to_sentence(string s)
   return t;
 }
 
+void usage() {
+  cerr << "Usage: mmg [options] < text_file" << endl;
+  cerr << "  -K <int>       run k-mmg" << endl;
+  cerr << "  -l <double>    run with gain limit" << endl;
+  cerr << "  -D             debug mode" << endl;
+  exit(0);
+}
+
 int main(int argc, char*argv[])
 {
   // parse args
@@ -41,41 +49,33 @@ int main(int argc, char*argv[])
       string s (argv[i]);
       if (s == "-D") {
         DEBUG = true;
-        continue;
       }
-      if (s == "-K") {
+      else if (s == "-K") {
         K = str_to_int(string(argv[i+1]));
-        mode = KMULTIPLE;
+        mode = K_MULTIPLE;
+        ++i;
       }
-      if (s == "-r") {
-        stringstream sin(argv[i+1]);
-        sin >> rho;
-        mode = ABSTRACTION;
+      else if (s == "-l") {
+        limit = str_to_double(argv[i+1]);
+        mode = GAIN_LIMIT;
+        ++i;
       }
-      if (s == "-A") {
-        all_output = true;
-      }
-      if (s == "-U") {
-        UNWEIGHTED_COVERING = true;
-      }
-      if (s == "-h") {
-        cerr << "Usage: mmg [options] < text_file" << endl;
-        cerr << "  -D             debug mode" << endl;
-        cerr << "  -K <int>       set k-mutliple" << endl;
-        cerr << "  -r <double>    unset k-mutliple and set rho" << endl;
-        cerr << "  -A             set all output mode" << endl;
-        cerr << "  -R             select randomly in division" << endl;
-        return 0;
+      else {
+        usage();
       }
     }
   }
 
   if (DEBUG) {
-    if (mode == KMULTIPLE) {
-      cerr << "mode: k-multiple; k=" << K << endl;
-    }
-    else {
-      cerr << "mode: abstraction; rho=" << rho << endl;
+    switch(mode) {
+      case K_MULTIPLE:
+        cerr << "  " << K << "-multiple" << endl;
+        break;
+      case GAIN_LIMIT:
+        cerr << "  run with limit " << limit << endl;
+        break;
+      default:
+        usage();
     }
   }
 
@@ -83,9 +83,7 @@ int main(int argc, char*argv[])
   vector<Text> docs;
   {
     string ln;
-    loop {
-      getline(cin, ln);
-      if (not cin) break;
+    while (getline(cin, ln)) {
       Text text = to_sentence(ln);
       docs.push_back(text);
     }
@@ -95,7 +93,7 @@ int main(int argc, char*argv[])
   init(docs, DEBUG);
 
   // 行くぜ
-  auto result = kmmg(mode, K, rho);
+  auto result = kmmg();
   for (auto& p: result) {
     cout << p << endl;
   }
