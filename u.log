@@ -1,4 +1,0 @@
-Usage: mmg [options] < text_file
-  -K <int>       run k-mmg
-  -l <double>    run with gain limit
-  -D             debug mode

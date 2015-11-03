@@ -261,28 +261,23 @@ Pattern tighten(Pattern p, const vi&c)
     }
   }
 
-  rep (i, n)
-  {
-    // <> -> <A>
-    if (p[i].t == VAR) {
+  // <> -> <A>
+  for (const string& pos: priority_fill) {
+    rep (i, n) {
+      if (p[i].t != VAR) continue;
       p[i].t = POS;
-      for (string& pos: priority_pos) {
-        p[i].pos = pos;
-        if (language_include(c, p)) return tighten(p, c);
-      }
-      for (string& pos: inpriority_pos) {
-        p[i].pos = pos;
-        if (language_include(c, p)) return tighten(p, c);
-      }
+      p[i].pos = pos;
+      if (language_include(c, p)) return tighten(p, c);
       p[i].t = VAR;
     }
+  }
 
-    // <A> -> a/A
-    if (p[i].t == POS) {
-      string pos = p[i].pos;
-      if (stoppos.count(pos)) continue;
+  // <A> -> a/A
+  for (const string& pos: priority_filler) {
+    rep (i, n) {
+      if (p[i].t != POS or p[i].pos != pos) continue;
       p[i].t = WORD;
-      for (string&w: dict[pos]) {
+      for (string&w: dict[p[i].pos]) {
         p[i].word = w;
         if (language_include(c, p)) return tighten(p, c);
       }
@@ -290,15 +285,64 @@ Pattern tighten(Pattern p, const vi&c)
     }
   }
 
-  Pattern q(n+1);
+  // <> -> <A>
+  for (const string& pos: normal_fill) {
+    rep (i, n) {
+      if (p[i].t != VAR) continue;
+      p[i].t = POS;
+      p[i].pos = pos;
+      if (language_include(c, p)) return tighten(p, c);
+      p[i].t = VAR;
+    }
+  }
+
+  // <A> -> a/A
+  for (const string& pos: normal_filler) {
+    rep (i, n) {
+      if (p[i].t != POS or p[i].pos != pos) continue;
+      p[i].t = WORD;
+      for (string&w: dict[p[i].pos]) {
+        p[i].word = w;
+        if (language_include(c, p)) return tighten(p, c);
+      }
+      p[i].t = POS;
+    }
+  }
 
   // <> -> <> <>
-  rep (i, n) {
-    q[i] = p[i];
-    if (p[i].t == VAR && (i == 0 or p[i-1].t != VAR)) {
-      q[i+1] = PUnit();
-      for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
-      if (language_include(c, q)) return tighten(q, c);
+  {
+    Pattern q(n+1);
+    rep (i, n) {
+      q[i] = p[i];
+      if (p[i].t == VAR && (i == 0 or p[i-1].t != VAR)) {
+        q[i+1] = PUnit();
+        for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
+        if (language_include(c, q)) return tighten(q, c);
+      }
+    }
+  }
+
+  // <> -> <A>
+  for (const string& pos: inpriority_fill) {
+    rep (i, n) {
+      if (p[i].t != VAR) continue;
+      p[i].t = POS;
+      p[i].pos = pos;
+      if (language_include(c, p)) return tighten(p, c);
+      p[i].t = VAR;
+    }
+  }
+
+  // <A> -> a/A
+  for (const string& pos: inpriority_filler) {
+    rep (i, n) {
+      if (p[i].t != POS or p[i].pos != pos) continue;
+      p[i].t = WORD;
+      for (string&w: dict[p[i].pos]) {
+        p[i].word = w;
+        if (language_include(c, p)) return tighten(p, c);
+      }
+      p[i].t = POS;
     }
   }
 
@@ -337,7 +381,7 @@ vector<pair<Pattern, set<int>>> cspc(Pattern p, const vi&c)
       for (string&w: dict[pos]) {
         p[i].word = w;
         auto s = coverset(p, c);
-        assert(s.size() < c.size() && "<A> -> a/A");
+        assert(s.size() <= c.size() && "<A> -> a/A");
         if (s.size() > 0) {
           ret.push_back({ p, s });
         }
@@ -351,7 +395,7 @@ vector<pair<Pattern, set<int>>> cspc(Pattern p, const vi&c)
       for (auto&pr: dict) {
         p[i].pos = pr.first;
         auto s = coverset(p, c);
-        assert(s.size() < c.size() && "<> -> <A>");
+        assert(s.size() <= c.size() && "<> -> <A>");
         if (s.size() > 0) {
           ret.push_back({ p, s });
         }
@@ -369,7 +413,7 @@ vector<pair<Pattern, set<int>>> cspc(Pattern p, const vi&c)
       q[i+1] = PUnit();
       for (int j = i + 1; j < n; ++j) q[j+1] = p[j];
       auto s = coverset(q, c);
-      assert(s.size() < c.size() && "<> -> <> <>");
+      assert(s.size() <= c.size() && "<> -> <> <>");
       if (s.size() > 0) {
         ret.push_back({ p, s });
       }
@@ -438,41 +482,40 @@ void init(vector<Text>& _docs, bool DEBUG) {
   class_size.clear();
   vocabulary.clear();
 
+
   for (const Text& doc: docs) {
     for (const Alphabet& a: doc) {
       vocabulary.insert(a);
     }
   }
+
   alphabet_size = vocabulary.size();
 
+  set<string> pos_set;
   for (const Alphabet& a: vocabulary) {
     class_size[a.pos]++;
+    pos_set.insert(a.pos);
   }
 
-  vector<string> __priority_pos;
-  for (auto pos: priority_pos) {
-    bool ok = false;
-    for (const auto&pr: class_size) {
-      if (pos == pr.first) { ok = true; break; }
-    }
-    if (ok) __priority_pos.push_back(pos);
-  }
-  priority_pos = __priority_pos;
+  /* construct POS list
+   * 優先するもの、優先しないものは global で定義
+   * どちらにも属さないものをリストアップしておく
+   */
 
-  for (const auto&pr: class_size) {
+  for (const string& pos: pos_set) {
     bool ok = true;
-    for (auto pos: priority_pos) {
-      if (pos == pr.first) { ok = false; break; }
-    }
-    if (ok) {
-      inpriority_pos.push_back(pr.first);
-    }
+    rep (i, priority_fill.size()) if (pos == priority_fill[i]) ok = false;
+    rep (i, inpriority_fill.size()) if (pos == inpriority_fill[i]) ok = false;
+    if (ok) normal_fill.push_back(pos);
   }
 
-  if (DEBUG) {
-    trace(priority_pos);
-    trace(inpriority_pos);
+  for (const string& pos: pos_set) {
+    bool ok = true;
+    rep (i, priority_filler.size()) if (pos == priority_filler[i]) ok = false;
+    rep (i, inpriority_filler.size()) if (pos == inpriority_filler[i]) ok = false;
+    if (ok) normal_filler.push_back(pos);
   }
+
 }
 
 

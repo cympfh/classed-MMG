@@ -16,7 +16,8 @@ pair<string, string> split_word_pos(string&s)
   }
   if (i <= 0) { return make_pair(s, s); }
   w = s.substr(0, i);
-  p = s.substr(i + 1);
+  // p = s.substr(i+1);
+  p = s.substr(i+1, 2);
   return make_pair(w, p);
 }
 
