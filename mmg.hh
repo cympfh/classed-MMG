@@ -16,4 +16,4 @@ vector<Pattern> kmmg();
 
 using State = long long unsigned int;
 
-Integer language_size(const Pattern&);
+int language_size(const Pattern&, int uplen=30);

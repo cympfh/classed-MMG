@@ -1,5 +1,5 @@
 test: mmg
-	./mmg -D -K 23 <input/wikiquote
+	./mmg -D -K 23 <sample/wikiquote
 
 mmg: objs global.cc util.cc mmg.cc main.cc
 	g++ -O3 -std=c++11 -o $@ setcover.o main.cc -lgmp -lgmpxx

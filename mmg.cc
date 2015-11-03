@@ -434,9 +434,9 @@ vector<pair<Pattern, vi>> division(vector<pair<Pattern, set<int>>>&ps, const vi&
   if (ps.size() == 0) return div;
 
   // solve set cover problem
-  vector<pair<set<int>, Integer>> ls(ps.size());
+  vector<pair<set<int>, int>> ls(ps.size());
   rep (i, ps.size()) {
-    Integer w = language_size(ps[i].first);
+    int w = language_size(ps[i].first);
     ls[i] = { ps[i].second, w };
   }
 
@@ -532,7 +532,7 @@ vector<Pattern> kmmg()
   vi cover_count(n, 1);
 
   // (priority, Pattern, cover)
-  priority_queue<pair<Integer, pair<Pattern, vi>>> pcs;
+  priority_queue<pair<int, pair<Pattern, vi>>> pcs;
   pcs.push({ 1, { pc, ids }});
   vector<Pattern> ret;
 
@@ -601,7 +601,7 @@ vector<Pattern> kmmg()
     { // push to queue
       for (auto& qc: qs) {
         Pattern& q = qc.first;
-        Integer pr = qc.second.size();
+        int pr = qc.second.size();
         pcs.push({ pr, { q, qc.second }});
         for (int i: qc.second) ++cover_count[i];
       }
@@ -618,21 +618,28 @@ vector<Pattern> kmmg()
   return ret;
 }
 
-
-
 /*
  * |L^{<= length(p)}(p)|
  */
-Integer language_size(const Pattern& p) {
-  Integer ret = 1;
+int language_size(const Pattern& p, int uplen) {
+  int r = 0;
+  int m = 1;
   for (auto&u: p) {
     if (u.t == VAR) {
-      ret *= alphabet_size;
+      ++r;
     } else if (u.t == POS) {
-      ret *= class_size[u.pos];
+      m *= class_size[u.pos];
+      if (m >= alphabet_size) {
+        m /= alphabet_size;
+        ++r;
+      }
     }
   }
-  return ret;
+  while (m >= alphabet_size) {
+    m /= alphabet_size;
+    ++r;
+  }
+  return r;
 }
 
 
